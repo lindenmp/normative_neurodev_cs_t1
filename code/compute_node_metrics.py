@@ -15,7 +15,7 @@ import scipy.io as sio
 # In[2]:
 
 
-sys.path.append('/Users/lindenmp/Dropbox/Work/ResProjects/NormativeNeuroDev_CrossSec/code/func/')
+sys.path.append('/Users/lindenmp/Dropbox/Work/ResProjects/NormativeNeuroDev_CrossSec_T1/code/func/')
 from proj_environment import set_proj_env
 from func import node_strength, ave_control, modal_control
 
@@ -70,11 +70,9 @@ if parc_str == 'schaefer' and parc_scale == 200:
 
 # output dataframe
 ct_labels = ['ct_' + str(i) for i in range(num_parcels)]
-str_labels = ['str_' + str(i) for i in range(num_parcels)]
-ac_labels = ['ac_' + str(i) for i in range(num_parcels)]
-mc_labels = ['mc_' + str(i) for i in range(num_parcels)]
+gmd_labels = ['gmd_' + str(i) for i in range(num_parcels)]
 
-df_node = pd.DataFrame(index = df.index, columns = ct_labels + str_labels + ac_labels + mc_labels)
+df_node = pd.DataFrame(index = df.index, columns = ct_labels + gmd_labels)
 df_node.insert(0, train_test_str, df[train_test_str])
 
 print(df_node.shape)
@@ -88,7 +86,8 @@ print(df_node.shape)
 CT = np.zeros((df.shape[0], num_parcels))
 
 for (i, (index, row)) in enumerate(df.iterrows()):
-    full_path = glob.glob(os.path.join(os.environ['CTDIR'], str(index[0]), '*' + str(index[1]), os.environ['CT_FILE_NAME']))[0]
+    file_name = os.environ['CT_NAME_TMP'].replace("scanid", str(index[1]))
+    full_path = os.path.join(os.environ['CTDIR'], file_name)
     
     ct = np.loadtxt(full_path)
     CT[i,:] = ct
@@ -96,110 +95,35 @@ for (i, (index, row)) in enumerate(df.iterrows()):
 df_node.loc[:,ct_labels] = CT
 
 
-# ## Load in connectivity matrices and compute node metrics
+# ## Load in gray matter density
 
 # In[10]:
 
 
-# fc stored as 3d matrix, subjects of 3rd dim
-A = np.zeros((num_parcels, num_parcels, df.shape[0]))
-S = np.zeros((df.shape[0], num_parcels))
-AC = np.zeros((df.shape[0], num_parcels))
-MC = np.zeros((df.shape[0], num_parcels))
-
-# subject filter
-subj_filt = np.zeros((df.shape[0],)).astype(bool)
+GMD = np.zeros((df.shape[0], num_parcels))
 
 for (i, (index, row)) in enumerate(df.iterrows()):
-    if parc_str == 'lausanne':
-        file_name = os.environ['SC_NAME_TMP'].replace("scanid", str(index[1]))
-        full_path = os.path.join(os.environ['SCDIR'], file_name)
-        try:
-            mat_contents = sio.loadmat(full_path)
-            a = mat_contents[os.environ['CONN_STR']]
-
-            A[:,:,i] = a
-            S[i,:] = node_strength(a)
-            AC[i,:] = ave_control(a)
-            MC[i,:] = modal_control(a)
-        except FileNotFoundError:
-            print(file_name + ': NOT FOUND')
-            subj_filt[i] = True
-            A[:,:,i] = np.full((num_parcels, num_parcels), np.nan)
-            S[i,:] = np.full(num_parcels, np.nan)
-            AC[i,:] = np.full(num_parcels, np.nan)
-            MC[i,:] = np.full(num_parcels, np.nan)
-    elif parc_str == 'schaefer':
-        file_name = os.environ['SC_NAME_TMP'].replace("scanid", str(index[1]))
-        file_name = file_name.replace("bblid", str(index[0]))
-        full_path = glob.glob(os.path.join(os.environ['SCDIR'], file_name))
-        if len(full_path) > 0:
-            mat_contents = sio.loadmat(full_path[0])
-            a = mat_contents[os.environ['CONN_STR']]
-
-            A[:,:,i] = a
-            S[i,:] = node_strength(a)
-            AC[i,:] = ave_control(a)
-            MC[i,:] = modal_control(a)
-        elif len(full_path) == 0:
-            print(file_name + ': NOT FOUND')
-            subj_filt[i] = True
-            A[:,:,i] = np.full((num_parcels, num_parcels), np.nan)
-            S[i,:] = np.full(num_parcels, np.nan)
-            AC[i,:] = np.full(num_parcels, np.nan)
-            MC[i,:] = np.full(num_parcels, np.nan)     
-
-df_node.loc[:,str_labels] = S
-df_node.loc[:,ac_labels] = AC
-df_node.loc[:,mc_labels] = MC
-
-
-# In[11]:
-
-
-np.sum(subj_filt)
-
-
-# In[12]:
-
-
-if any(subj_filt):
-    A = A[:,:,~subj_filt]
-    df = df.loc[~subj_filt]
-    df_node = df_node.loc[~subj_filt]
-
-
-# ### Get streamline count and network density
-
-# In[13]:
-
-
-A_c = np.zeros((A.shape[2],))
-A_d = np.zeros((A.shape[2],))
-for i in range(A.shape[2]):
-    a = A[:,:,i]
-    A_c[i] = np.sum(np.triu(a))
-    A_d[i] = np.count_nonzero(np.triu(a))/((a.shape[0]**2-a.shape[0])/2)
-df['streamline_count'] = A_c
-df['network_density'] = A_d
+    file_name = os.environ['GMD_NAME_TMP'].replace("scanid", str(index[1]))
+    full_path = os.path.join(os.environ['GMDDIR'], file_name)
+    
+    gmd = np.loadtxt(full_path)
+    GMD[i,:] = gmd
+    
+df_node.loc[:,gmd_labels] = GMD
 
 
 # ## Save out
 
-# In[14]:
+# In[11]:
 
 
 os.environ['MODELDIR']
 
 
-# In[15]:
+# In[12]:
 
 
 # Save out
-np.save(os.path.join(os.environ['MODELDIR'], 'A'), A)
 df_node.to_csv(os.path.join(os.environ['MODELDIR'], 'df_node_base.csv'))
 df.to_csv(os.path.join(os.environ['MODELDIR'], 'df_pheno.csv'))
-
-if any(subj_filt):
-    np.save(os.path.join(os.environ['MODELDIR'], 'subj_filt'), subj_filt)
 
