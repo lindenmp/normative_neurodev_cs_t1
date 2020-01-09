@@ -14,7 +14,7 @@ import numpy as np
 # In[2]:
 
 
-sys.path.append('/Users/lindenmp/Dropbox/Work/ResProjects/NormativeNeuroDev_CrossSec/code/func/')
+sys.path.append('/Users/lindenmp/Dropbox/Work/ResProjects/NormativeNeuroDev_CrossSec_T1/code/func/')
 from proj_environment import set_proj_env
 from func import get_synth_cov
 
@@ -26,9 +26,7 @@ train_test_str = 'squeakycleanExclude'
 exclude_str = 't1Exclude' # 't1Exclude' 'fsFinalExclude'
 parc_str = 'schaefer' # 'schaefer' 'lausanne'
 parc_scale = 400 # 200 400 | 60 125
-extra_str = ''
-# extra_str = '_nuis-netdens'
-# extra_str = '_nuis-str'
+extra_str = '_no_wins'
 parcel_names, parcel_loc, drop_parcels, num_parcels, yeo_idx, yeo_labels = set_proj_env(train_test_str = train_test_str, exclude_str = exclude_str,
                                                                             parc_str = parc_str, parc_scale = parc_scale, extra_str = extra_str)
 
