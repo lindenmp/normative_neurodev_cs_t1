@@ -32,7 +32,7 @@ train_test_str = 'squeakycleanExclude'
 exclude_str = 't1Exclude' # 't1Exclude' 'fsFinalExclude'
 parc_str = 'schaefer' # 'schaefer' 'lausanne'
 parc_scale = 400 # 200 400 | 60 125
-extra_str = '_no_wins'
+extra_str = ''
 parcel_names, parcel_loc, drop_parcels, num_parcels, yeo_idx, yeo_labels = set_proj_env(train_test_str = train_test_str, exclude_str = exclude_str,
                                                                             parc_str = parc_str, parc_scale = parc_scale, extra_str = extra_str)
 
@@ -85,7 +85,7 @@ sns.set(style='white', context = 'talk', font_scale = .8)
 # In[9]:
 
 
-metrics = ('ct', 'gmd')
+metrics = ('ct', 'jd')
 df_node_mean = pd.DataFrame(index = df_node.index, columns = metrics)
 for metric in metrics:
     df_node_mean[metric] = df_node.filter(regex = metric, axis = 1).mean(axis = 1)
@@ -106,7 +106,7 @@ f.ax_joint.collections[0].set_alpha(0)
 
 
 metric_x = 'ageAtScan1'
-metric_y = 'gmd'
+metric_y = 'jd'
 f = sns.jointplot(x = df[metric_x], y = df_node_mean[metric_y], kind="reg")
 f.annotate(sp.stats.spearmanr)
 f.plot_joint(plt.scatter, c = "k", s = 5, linewidth = 2, marker = ".", alpha = 0.3)
@@ -128,9 +128,8 @@ for metric in metrics:
     print(metric + ': ' + str(np.round((outliers.sum() / x.shape[0]) * 100,2)))
 
 
-# A higher threshold than 3 probably makes sense but sticking with convention to avoid 'kick me' signs with reviewers.
-# 
-# Note, results are unaffected by setting my_thresh to 4,5, or 6
+# Setting threshold to 100 basically 'skips' this step - pretty lazy way of doing it though!
+# Note, results are unaffected by setting my_thresh to 3, 4,5, or 6
 
 # ### Check frequency of outliers
 
@@ -211,7 +210,7 @@ f.ax_joint.collections[0].set_alpha(0)
 # In[20]:
 
 
-f = sns.jointplot(x = df['ageAtScan1_Years'], y = df_node['gmd_0'], kind="reg")
+f = sns.jointplot(x = df['ageAtScan1_Years'], y = df_node['jd_0'], kind="reg")
 f.annotate(sp.stats.spearmanr)
 # f.annotate(sp.stats.pearsonr)
 f.plot_joint(plt.scatter, c = "k", s = 5, linewidth = 2, marker = ".", alpha = 0.3)
@@ -221,7 +220,7 @@ f.ax_joint.collections[0].set_alpha(0)
 # In[21]:
 
 
-f = sns.jointplot(x = df_node['ct_0'], y = df_node['gmd_0'], kind="reg")
+f = sns.jointplot(x = df_node['ct_0'], y = df_node['jd_0'], kind="reg")
 f.annotate(sp.stats.spearmanr)
 # f.annotate(sp.stats.pearsonr)
 f.plot_joint(plt.scatter, c = "k", s = 5, linewidth = 2, marker = ".", alpha = 0.3)
@@ -237,16 +236,19 @@ df_node.head()
 # In[23]:
 
 
-df_node_mean = pd.DataFrame(index = df_node.index, columns = metrics)
-for metric in metrics:
-    df_node_mean[metric] = df_node.filter(regex = metric, axis = 1).mean(axis = 1)
+metric_x = 'ageAtScan1_Years'
+metric_y = 'ct'
+f = sns.jointplot(x = df[metric_x], y = df_node_mean[metric_y], kind="reg")
+f.annotate(sp.stats.spearmanr)
+f.plot_joint(plt.scatter, c = "k", s = 5, linewidth = 2, marker = ".", alpha = 0.3)
+f.ax_joint.collections[0].set_alpha(0)
 
 
 # In[24]:
 
 
-metric_x = 'ageAtScan1'
-metric_y = 'ct'
+metric_x = 'ageAtScan1_Years'
+metric_y = 'jd'
 f = sns.jointplot(x = df[metric_x], y = df_node_mean[metric_y], kind="reg")
 f.annotate(sp.stats.spearmanr)
 f.plot_joint(plt.scatter, c = "k", s = 5, linewidth = 2, marker = ".", alpha = 0.3)
@@ -256,23 +258,12 @@ f.ax_joint.collections[0].set_alpha(0)
 # In[25]:
 
 
-metric_x = 'ageAtScan1'
-metric_y = 'gmd'
-f = sns.jointplot(x = df[metric_x], y = df_node_mean[metric_y], kind="reg")
-f.annotate(sp.stats.spearmanr)
-f.plot_joint(plt.scatter, c = "k", s = 5, linewidth = 2, marker = ".", alpha = 0.3)
-f.ax_joint.collections[0].set_alpha(0)
-
-
-# In[26]:
-
-
 df_node.isna().any().any()
 
 
 # ## Save out
 
-# In[27]:
+# In[26]:
 
 
 # Save out
