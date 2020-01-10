@@ -7,16 +7,14 @@ from normative import estimate
 exclude_str = 't1Exclude'
 # exclude_str = 'fsFinalExclude'
 
-combo_label = 'schaefer_400_streamlineCount'
-# combo_label = 'schaefer_400_streamlineCount_nuis-netdens'
-# combo_label = 'schaefer_400_streamlineCount_nuis-str'
-# combo_label = 'schaefer_200_streamlineCount'
+combo_label = 'schaefer_400'
+# combo_label = 'schaefer_200'
 
-# combo_label = 'lausanne_234_streamlineCount'
-# combo_label = 'lausanne_129_streamlineCount'
+# combo_label = 'lausanne_234'
+# combo_label = 'lausanne_129'
 
 # Cross-sec
-normativedir = os.path.join('/Users/lindenmp/Dropbox/Work/ResProjects/NormativeNeuroDev_CrossSec/analysis/normative',
+normativedir = os.path.join('/Users/lindenmp/Dropbox/Work/ResProjects/NormativeNeuroDev_CrossSec_T1/analysis/normative',
 	exclude_str, 'squeakycleanExclude', combo_label, 'ageAtScan1_Years+sex_adj/') # Linden's Macbook Pro
 
 print(normativedir)
