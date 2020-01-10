@@ -17,7 +17,6 @@ import scipy.io as sio
 
 sys.path.append('/Users/lindenmp/Dropbox/Work/ResProjects/NormativeNeuroDev_CrossSec_T1/code/func/')
 from proj_environment import set_proj_env
-from func import node_strength, ave_control, modal_control
 
 
 # In[3]:
@@ -60,9 +59,9 @@ print(df.shape)
 # In[7]:
 
 
-# Missing data file for this subject only for schaefer 200
-if parc_str == 'schaefer' and parc_scale == 200:
-    df.drop(labels = (112598, 5161), inplace=True)
+# Corrupted jacobian file
+if parc_str == 'schaefer' and parc_scale == 400:
+    df.drop(labels = (133007, 6259), inplace=True)
 
 
 # In[8]:
@@ -70,9 +69,9 @@ if parc_str == 'schaefer' and parc_scale == 200:
 
 # output dataframe
 ct_labels = ['ct_' + str(i) for i in range(num_parcels)]
-gmd_labels = ['gmd_' + str(i) for i in range(num_parcels)]
+jd_labels = ['jd_' + str(i) for i in range(num_parcels)]
 
-df_node = pd.DataFrame(index = df.index, columns = ct_labels + gmd_labels)
+df_node = pd.DataFrame(index = df.index, columns = ct_labels + jd_labels)
 df_node.insert(0, train_test_str, df[train_test_str])
 
 print(df_node.shape)
@@ -95,21 +94,21 @@ for (i, (index, row)) in enumerate(df.iterrows()):
 df_node.loc[:,ct_labels] = CT
 
 
-# ## Load in gray matter density
+# ## Load in jacobian determinants
 
 # In[10]:
 
 
-GMD = np.zeros((df.shape[0], num_parcels))
+JD = np.zeros((df.shape[0], num_parcels))
 
 for (i, (index, row)) in enumerate(df.iterrows()):
-    file_name = os.environ['GMD_NAME_TMP'].replace("scanid", str(index[1]))
-    full_path = os.path.join(os.environ['GMDDIR'], file_name)
+    file_name = os.environ['JD_NAME_TMP'].replace("scanid", str(index[1]))
+    full_path = os.path.join(os.environ['JDDIR'], file_name)
     
-    gmd = np.loadtxt(full_path)
-    GMD[i,:] = gmd
+    jd = np.loadtxt(full_path)
+    JD[i,:] = jd
     
-df_node.loc[:,gmd_labels] = GMD
+df_node.loc[:,jd_labels] = JD
 
 
 # ## Save out
