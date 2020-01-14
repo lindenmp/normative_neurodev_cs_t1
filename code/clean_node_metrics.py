@@ -189,7 +189,8 @@ print(nuis)
 df_nuis = df[nuis]
 df_nuis = sm.add_constant(df_nuis)
 
-cols = df_node.columns
+my_str = '|'.join(metrics); print(my_str)
+cols = df_node.filter(regex = my_str, axis = 1).columns
 
 mdl = sm.OLS(df_node.loc[:,cols].astype(float), df_nuis.astype(float)).fit()
 y_pred = mdl.predict(df_nuis)
