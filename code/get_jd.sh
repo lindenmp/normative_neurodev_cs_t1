@@ -2,11 +2,12 @@
 in_dir='/Users/lindenmp/Dropbox/Work/ResData/PNC/processedData/scaledJacobians/'
 
 cd ${in_dir}
-for scan in *
+for scan in *.nii.gz
 do
     echo ${scan}
-    name=$(echo "$scan" | cut -f 1 -d '.')
+    out_label=$(echo "$scan" | cut -f 1 -d '.')
+    scanid=$(echo "$out_label" | cut -f 1 -d '_')
 
-    parc_file='/Users/lindenmp/Dropbox/Work/ResProjects/NormativeNeuroDev_CrossSec_T1/templates/schaefer2018PNC2mm/Schaefer2018_400_17Networks_PNC_2mm.nii.gz'
-    fslmeants -i ${scan} --label=${parc_file} -o ${name}_schaefer400_17.txt
+    parc_file='/Users/lindenmp/Dropbox/Work/ResData/PNC/processedData/gm_masks_template/'${scanid}'_atropos3class_seg_GmMask_Template_Schaefer400_17.nii.gz'
+    fslmeants -i ${scan} --label=${parc_file} -o ${out_label}_schaefer400_17_gm.txt
 done
