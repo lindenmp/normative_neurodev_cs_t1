@@ -189,7 +189,7 @@ print(nuis)
 df_nuis = df[nuis]
 df_nuis = sm.add_constant(df_nuis)
 
-cols = df_node.filter(regex = 'ct|gmd', axis = 1).columns
+cols = df_node.columns
 
 mdl = sm.OLS(df_node.loc[:,cols].astype(float), df_nuis.astype(float)).fit()
 y_pred = mdl.predict(df_nuis)
@@ -200,40 +200,18 @@ df_node.loc[:,cols] = df_node.loc[:,cols] - y_pred
 # In[19]:
 
 
-f = sns.jointplot(x = df['ageAtScan1_Years'], y = df_node['ct_0'], kind="reg")
-f.annotate(sp.stats.spearmanr)
-# f.annotate(sp.stats.pearsonr)
-f.plot_joint(plt.scatter, c = "k", s = 5, linewidth = 2, marker = ".", alpha = 0.3)
-f.ax_joint.collections[0].set_alpha(0)
+df_node.head()
 
 
 # In[20]:
 
 
-f = sns.jointplot(x = df['ageAtScan1_Years'], y = df_node['jd_0'], kind="reg")
-f.annotate(sp.stats.spearmanr)
-# f.annotate(sp.stats.pearsonr)
-f.plot_joint(plt.scatter, c = "k", s = 5, linewidth = 2, marker = ".", alpha = 0.3)
-f.ax_joint.collections[0].set_alpha(0)
+df_node_mean = pd.DataFrame(index = df_node.index, columns = metrics)
+for metric in metrics:
+    df_node_mean[metric] = df_node.filter(regex = metric, axis = 1).mean(axis = 1)
 
 
 # In[21]:
-
-
-f = sns.jointplot(x = df_node['ct_0'], y = df_node['jd_0'], kind="reg")
-f.annotate(sp.stats.spearmanr)
-# f.annotate(sp.stats.pearsonr)
-f.plot_joint(plt.scatter, c = "k", s = 5, linewidth = 2, marker = ".", alpha = 0.3)
-f.ax_joint.collections[0].set_alpha(0)
-
-
-# In[22]:
-
-
-df_node.head()
-
-
-# In[23]:
 
 
 metric_x = 'ageAtScan1_Years'
@@ -244,7 +222,7 @@ f.plot_joint(plt.scatter, c = "k", s = 5, linewidth = 2, marker = ".", alpha = 0
 f.ax_joint.collections[0].set_alpha(0)
 
 
-# In[24]:
+# In[22]:
 
 
 metric_x = 'ageAtScan1_Years'
@@ -255,7 +233,68 @@ f.plot_joint(plt.scatter, c = "k", s = 5, linewidth = 2, marker = ".", alpha = 0
 f.ax_joint.collections[0].set_alpha(0)
 
 
+# In[23]:
+
+
+metric_x = 'ct'
+metric_y = 'jd'
+f = sns.jointplot(x = df_node_mean[metric_x], y = df_node_mean[metric_y], kind="reg")
+f.annotate(sp.stats.spearmanr)
+f.plot_joint(plt.scatter, c = "k", s = 5, linewidth = 2, marker = ".", alpha = 0.3)
+f.ax_joint.collections[0].set_alpha(0)
+
+
+# In[24]:
+
+
+R = np.zeros(num_parcels-1)
+for i in range(0,num_parcels-1):
+    R[i] = sp.stats.pearsonr(df_node.loc[:,'ct_'+str(i)],df_node.loc[:,'jd_'+str(i)])[0]
+
+
 # In[25]:
+
+
+sns.distplot(R)
+
+
+# In[26]:
+
+
+f = sns.jointplot(x = df_node['ct_'+str(np.argmax(R))], y = df_node['jd_'+str(np.argmax(R))], kind="reg")
+f.annotate(sp.stats.spearmanr)
+# f.annotate(sp.stats.pearsonr)
+f.plot_joint(plt.scatter, c = "k", s = 5, linewidth = 2, marker = ".", alpha = 0.3)
+f.ax_joint.collections[0].set_alpha(0)
+
+
+# In[27]:
+
+
+f = sns.jointplot(x = df_node['ct_'+str(np.argmin(R))], y = df_node['jd_'+str(np.argmin(R))], kind="reg")
+f.annotate(sp.stats.spearmanr)
+# f.annotate(sp.stats.pearsonr)
+f.plot_joint(plt.scatter, c = "k", s = 5, linewidth = 2, marker = ".", alpha = 0.3)
+f.ax_joint.collections[0].set_alpha(0)
+
+
+# In[28]:
+
+
+val = np.min(np.abs(R))
+
+
+# In[29]:
+
+
+f = sns.jointplot(x = df_node['ct_'+str(np.where(R == val)[0][0])], y = df_node['jd_'+str(np.where(R == val)[0][0])], kind="reg")
+f.annotate(sp.stats.spearmanr)
+# f.annotate(sp.stats.pearsonr)
+f.plot_joint(plt.scatter, c = "k", s = 5, linewidth = 2, marker = ".", alpha = 0.3)
+f.ax_joint.collections[0].set_alpha(0)
+
+
+# In[30]:
 
 
 df_node.isna().any().any()
@@ -263,7 +302,7 @@ df_node.isna().any().any()
 
 # ## Save out
 
-# In[26]:
+# In[31]:
 
 
 # Save out
