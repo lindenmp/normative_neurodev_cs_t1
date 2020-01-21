@@ -86,7 +86,7 @@ def brain_plot(roi_data, parcel_names, parc_file, fig_str, subject_id = 'lausann
         if center_anchor != 0:
             view = 'lat'
             fname1 = view + '_' + fig_str + '.png'
-            fig = my.mlab.figure(size = (500,500))
+            fig = my.mlab.figure(size = (1000,1000))
             fig = my.mlab.gcf()
             brain = surfer.Brain(subject_id, hemi, surf, figure = fig, views = view, background = 'white', alpha = 1)
             brain.add_data(vtx_data, max = center_anchor, center = 0, thresh = -999, colormap = color, alpha = 1, colorbar = True)
@@ -95,7 +95,7 @@ def brain_plot(roi_data, parcel_names, parc_file, fig_str, subject_id = 'lausann
 
             view = 'med'
             fname2 = view + '_' + fig_str + '.png'
-            fig = my.mlab.figure(size = (500,500))
+            fig = my.mlab.figure(size = (1000,1000))
             fig = my.mlab.gcf()
             brain = surfer.Brain(subject_id, hemi, surf, figure = fig, views = view, background = 'white', alpha = 1)
             brain.add_data(vtx_data, max = center_anchor, center = 0, thresh = -999, colormap = color, alpha = 1, colorbar = True)
@@ -105,7 +105,7 @@ def brain_plot(roi_data, parcel_names, parc_file, fig_str, subject_id = 'lausann
     elif color == 'hot':
         view = 'lat'
         fname1 = view + '_' + fig_str + '.png'
-        fig = my.mlab.figure(size = (500,500))
+        fig = my.mlab.figure(size = (1000,1000))
         fig = my.mlab.gcf()
         brain = surfer.Brain(subject_id, hemi, surf, figure = fig, views = view, background = 'white', alpha = 1)
         brain.add_data(vtx_data, min = 0, max = plot_max, thresh = -999, colormap = color, alpha = 1, colorbar = True)
@@ -114,7 +114,7 @@ def brain_plot(roi_data, parcel_names, parc_file, fig_str, subject_id = 'lausann
 
         view = 'med'
         fname2 = view + '_' + fig_str + '.png'
-        fig = my.mlab.figure(size = (500,500))
+        fig = my.mlab.figure(size = (1000,1000))
         fig = my.mlab.gcf()
         brain = surfer.Brain(subject_id, hemi, surf, figure = fig, views = view, background = 'white', alpha = 1)
         brain.add_data(vtx_data, min = 0, max = plot_max, thresh = -999, colormap = color, alpha = 1, colorbar = True)
@@ -124,7 +124,7 @@ def brain_plot(roi_data, parcel_names, parc_file, fig_str, subject_id = 'lausann
         if abs(plot_max) != abs(plot_min):
             view = 'lat'
             fname1 = view + '_' + fig_str + '.png'
-            fig = my.mlab.figure(size = (500,500))
+            fig = my.mlab.figure(size = (1000,1000))
             fig = my.mlab.gcf()
             brain = surfer.Brain(subject_id, hemi, surf, figure = fig, views = view, background = 'white', alpha = 1)
             brain.add_data(vtx_data, min = 0, max = plot_max, thresh = -999, colormap = color, alpha = 1, colorbar = True)
@@ -133,7 +133,7 @@ def brain_plot(roi_data, parcel_names, parc_file, fig_str, subject_id = 'lausann
 
             view = 'med'
             fname2 = view + '_' + fig_str + '.png'
-            fig = my.mlab.figure(size = (500,500))
+            fig = my.mlab.figure(size = (1000,1000))
             fig = my.mlab.gcf()
             brain = surfer.Brain(subject_id, hemi, surf, figure = fig, views = view, background = 'white', alpha = 1)
             brain.add_data(vtx_data, min = 0, max = plot_max, thresh = -999, colormap = color, alpha = 1, colorbar = True)
