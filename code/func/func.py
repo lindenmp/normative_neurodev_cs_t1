@@ -7,6 +7,7 @@ from IPython.display import clear_output
 
 import numpy as np
 import scipy as sp
+from scipy.stats import t
 import pandas as pd
 
 from numpy.matlib import repmat 
@@ -381,4 +382,57 @@ def perc_dev(Z, thr = 2.6, sign = 'abs'):
     Z_perc = np.sum(bol, axis = 1) / Z.shape[1] * 100
     
     return Z_perc
+
+
+def summarise_network(df_z, roi_loc, network_idx, metrics = ('ct', 'deg', 'ac', 'mc'), method = 'median'):
+
+    df_out = pd.DataFrame()
+    for metric in metrics:
+        if metric == 'ct':
+            if method == 'median': df_tmp = df_z.filter(regex = metric).groupby(network_idx[roi_loc == 1], axis = 1).median()
+            if method == 'mean': df_tmp = df_z.filter(regex = metric).groupby(network_idx[roi_loc == 1], axis = 1).mean()
+            if method == 'max': df_tmp = df_z.filter(regex = metric).groupby(network_idx[roi_loc == 1], axis = 1).max()
+            
+            my_list = [metric + '_' + str(i) for i in np.unique(network_idx[roi_loc == 1]).astype(int)]
+            df_tmp.columns = my_list
+        else:
+            if method == 'median': df_tmp = df_z.filter(regex = metric).groupby(network_idx, axis = 1).median()
+            if method == 'mean': df_tmp = df_z.filter(regex = metric).groupby(network_idx, axis = 1).mean()
+            if method == 'max': df_tmp = df_z.filter(regex = metric).groupby(network_idx, axis = 1).max()
+            
+            my_list = [metric + '_' + str(i) for i in np.unique(network_idx).astype(int)]
+            df_tmp.columns = my_list
+
+        df_out = pd.concat((df_out, df_tmp), axis = 1)
+
+    return df_out
+
+
+def dependent_corr(xy, xz, yz, n, twotailed=True):
+    """
+    Calculates the statistic significance between two dependent correlation coefficients
+    @param xy: correlation coefficient between x and y
+    @param xz: correlation coefficient between x and z
+    @param yz: correlation coefficient between y and z
+    @param n: number of elements in x, y and z
+    @param twotailed: whether to calculate a one or two tailed test, only works for 'steiger' method
+    @param conf_level: confidence level, only works for 'zou' method
+    @param method: defines the method uses, 'steiger' or 'zou'
+    @return: t and p-val
+    
+    Author: Philipp Singer (www.philippsinger.info)
+    copied on 20/1/2020 from https://github.com/psinger/CorrelationStats/blob/master/corrstats.py
+    """
+    d = xy - xz
+    determin = 1 - xy * xy - xz * xz - yz * yz + 2 * xy * xz * yz
+    av = (xy + xz)/2
+    cube = (1 - yz) * (1 - yz) * (1 - yz)
+
+    t2 = d * np.sqrt((n - 1) * (1 + yz)/(((2 * (n - 1)/(n - 3)) * determin + av * av * cube)))
+    p = 1 - t.cdf(abs(t2), n - 3)
+
+    if twotailed:
+        p *= 2
+
+    return t2, p
 
