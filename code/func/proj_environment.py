@@ -36,12 +36,12 @@ def set_proj_env(dataset = 'PNC', train_test_str = 'squeakycleanExclude', exclud
         num_parcels = parcel_names.shape[0]
 
     # Cortical thickness directory
-    ctdir = os.path.join(derivsdir, 'processedData/voxelwiseMaps_antsCt'); os.environ['CTDIR'] = ctdir
-    jddir = os.path.join(derivsdir, 'processedData/scaledJacobians'); os.environ['JDDIR'] = jddir
+    ctdir = os.path.join(derivsdir, 'processedData/antsCorticalThickness'); os.environ['CTDIR'] = ctdir
+    voldir = os.path.join(derivsdir, 'processedData/gm_vol_masks_native'); os.environ['VOLDIR'] = voldir
 
     if parc_str == 'schaefer':
-        ct_name_tmp = 'scanid_CorticalThicknessNormalizedToTemplate2mm_schaefer' + str(parc_scale) + '_17_gm.txt'; os.environ['CT_NAME_TMP'] = ct_name_tmp
-        jd_name_tmp = 'scanid_logJacDet_schaefer' + str(parc_scale) + '_17_gm.txt'; os.environ['JD_NAME_TMP'] = jd_name_tmp
+        ct_name_tmp = 'bblid/*xscanid/ct_schaefer' + str(parc_scale) + '_17.txt'; os.environ['CT_NAME_TMP'] = ct_name_tmp
+        vol_name_tmp = 'bblid/*xscanid/Schaefer2018_' + str(parc_scale) + '_17Networks_native_gm.nii.gz'; os.environ['VOL_NAME_TMP'] = vol_name_tmp
 
     # Normative dir based on the train/test split --> specific combinations of parcellation/number of parcels/edge weight come off this directory
     # This is the first of the output directories for the project and is created by get_train_test.ipynb if it doesn't exist
