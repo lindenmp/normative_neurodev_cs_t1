@@ -22,7 +22,6 @@ import matplotlib.pyplot as plt
 
 sys.path.append('/Users/lindenmp/Dropbox/Work/ResProjects/NormativeNeuroDev_CrossSec_T1/code/func/')
 from proj_environment import set_proj_env
-from func import mark_outliers, winsorize_outliers_signed
 
 
 # In[3]:
@@ -85,7 +84,7 @@ sns.set(style='white', context = 'talk', font_scale = .8)
 # In[9]:
 
 
-metrics = ('ct', 'jd')
+metrics = ('ct', 'vol')
 df_node_mean = pd.DataFrame(index = df_node.index, columns = metrics)
 for metric in metrics:
     df_node_mean[metric] = df_node.filter(regex = metric, axis = 1).mean(axis = 1)
@@ -106,7 +105,7 @@ f.ax_joint.collections[0].set_alpha(0)
 
 
 metric_x = 'ageAtScan1'
-metric_y = 'jd'
+metric_y = 'vol'
 f = sns.jointplot(x = df[metric_x], y = df_node_mean[metric_y], kind="reg")
 f.annotate(sp.stats.pearsonr)
 f.plot_joint(plt.scatter, c = "k", s = 5, linewidth = 2, marker = ".", alpha = 0.3)
@@ -128,8 +127,6 @@ df_node.shape
 
 
 # ## Nuisance regression
-
-# ### cortical thickness
 
 # In[14]:
 
@@ -178,7 +175,7 @@ f.ax_joint.collections[0].set_alpha(0)
 
 
 metric_x = 'ageAtScan1_Years'
-metric_y = 'jd'
+metric_y = 'vol'
 f = sns.jointplot(x = df[metric_x], y = df_node_mean[metric_y], kind="reg")
 f.annotate(sp.stats.pearsonr)
 f.plot_joint(plt.scatter, c = "k", s = 5, linewidth = 2, marker = ".", alpha = 0.3)
@@ -189,7 +186,7 @@ f.ax_joint.collections[0].set_alpha(0)
 
 
 metric_x = 'ct'
-metric_y = 'jd'
+metric_y = 'vol'
 f = sns.jointplot(x = df_node_mean[metric_x], y = df_node_mean[metric_y], kind="reg")
 f.annotate(sp.stats.pearsonr)
 f.plot_joint(plt.scatter, c = "k", s = 5, linewidth = 2, marker = ".", alpha = 0.3)
@@ -201,7 +198,7 @@ f.ax_joint.collections[0].set_alpha(0)
 
 R = np.zeros(num_parcels-1)
 for i in range(0,num_parcels-1):
-    R[i] = sp.stats.pearsonr(df_node.loc[:,'ct_'+str(i)],df_node.loc[:,'jd_'+str(i)])[0]
+    R[i] = sp.stats.pearsonr(df_node.loc[:,'ct_'+str(i)],df_node.loc[:,'vol_'+str(i)])[0]
 
 
 # In[21]:
@@ -213,7 +210,7 @@ sns.distplot(R)
 # In[22]:
 
 
-f = sns.jointplot(x = df_node['ct_'+str(np.argmax(R))], y = df_node['jd_'+str(np.argmax(R))], kind="reg")
+f = sns.jointplot(x = df_node['ct_'+str(np.argmax(R))], y = df_node['vol_'+str(np.argmax(R))], kind="reg")
 f.annotate(sp.stats.pearsonr)
 f.plot_joint(plt.scatter, c = "k", s = 5, linewidth = 2, marker = ".", alpha = 0.3)
 f.ax_joint.collections[0].set_alpha(0)
@@ -222,7 +219,7 @@ f.ax_joint.collections[0].set_alpha(0)
 # In[23]:
 
 
-f = sns.jointplot(x = df_node['ct_'+str(np.argmin(R))], y = df_node['jd_'+str(np.argmin(R))], kind="reg")
+f = sns.jointplot(x = df_node['ct_'+str(np.argmin(R))], y = df_node['vol_'+str(np.argmin(R))], kind="reg")
 f.annotate(sp.stats.pearsonr)
 f.plot_joint(plt.scatter, c = "k", s = 5, linewidth = 2, marker = ".", alpha = 0.3)
 f.ax_joint.collections[0].set_alpha(0)
@@ -231,27 +228,12 @@ f.ax_joint.collections[0].set_alpha(0)
 # In[24]:
 
 
-val = np.min(np.abs(R))
-
-
-# In[25]:
-
-
-f = sns.jointplot(x = df_node['ct_'+str(np.where(R == val)[0][0])], y = df_node['jd_'+str(np.where(R == val)[0][0])], kind="reg")
-f.annotate(sp.stats.pearsonr)
-f.plot_joint(plt.scatter, c = "k", s = 5, linewidth = 2, marker = ".", alpha = 0.3)
-f.ax_joint.collections[0].set_alpha(0)
-
-
-# In[26]:
-
-
 df_node.isna().any().any()
 
 
 # ## Save out
 
-# In[27]:
+# In[25]:
 
 
 # Save out
