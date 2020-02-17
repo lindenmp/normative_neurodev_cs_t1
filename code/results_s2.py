@@ -30,12 +30,10 @@ from func import run_corr, get_fdr_p, update_progress, get_null_p, get_cmap, get
 
 train_test_str = 'squeakycleanExclude'
 exclude_str = 't1Exclude' # 't1Exclude' 'fsFinalExclude'
-parc_str = 'schaefer' # 'schaefer' 'lausanne'
+parc_str = 'schaefer'
 parc_scale = 400 # 200 400 | 60 125
 primary_covariate = 'ageAtScan1_Years'
 extra_str = ''
-# extra_str = '_nuis-netdens'
-# extra_str = '_nuis-str'
 parcel_names, parcel_loc, drop_parcels, num_parcels, yeo_idx, yeo_labels = set_proj_env(train_test_str = train_test_str, exclude_str = exclude_str,
                                                                             parc_str = parc_str, parc_scale = parc_scale, extra_str = extra_str)
 
@@ -43,22 +41,7 @@ parcel_names, parcel_loc, drop_parcels, num_parcels, yeo_idx, yeo_labels = set_p
 # In[4]:
 
 
-# Set brainstem to part of subcortex in Yeo
-if parc_str == 'lausanne' and parc_variant == 'orig':
-    yeo_idx[yeo_idx == 9] = 8
-    yeo_labels = yeo_labels[:-1]
-
-
-# ## Drop subcortex and brainstem from cortical thickness estimates
-
-# In[5]:
-
-
-# Retain only cortex for cortical thickness
-if parc_str == 'lausanne':
-    drop_me = np.where(parcel_loc != 1)[0]
-    my_list = ['ct_' + str(i) for i in drop_me]
-    print(my_list)
+sns.set(style='white', context = 'paper', font_scale = 1)
 
 
 # In[6]:
@@ -107,8 +90,6 @@ df_node.set_index(['bblid', 'scanid'], inplace = True)
 
 # age effect on training set
 df_age_effect = run_corr(df_train[primary_covariate], df_node_train, typ = 'spearmanr'); df_age_effect['p_fdr'] = get_fdr_p(df_age_effect['p'])
-if parc_str == 'lausanne':
-    df_age_effect.drop(my_list, axis = 0, inplace = True)
 age_alpha = 0.05
 age_filter = df_age_effect['p_fdr'].values < age_alpha
 
@@ -140,23 +121,6 @@ df_smse = pd.DataFrame(data = smse, index = df_node.columns)
 
 z = np.loadtxt(os.path.join(os.environ['NORMATIVEDIR'], 'Z.txt'), delimiter = ' ').transpose()
 df_z = pd.DataFrame(data = z, index = df_node.index, columns = df_node.columns)
-
-
-# In[14]:
-
-
-if parc_str == 'lausanne':
-    my_bol = df_node.columns.isin(my_list)
-
-
-# In[15]:
-
-
-if parc_str == 'lausanne':
-    df_node.drop(my_list, axis = 1, inplace = True)
-    df_yhat_forward.drop(my_list, axis = 1, inplace = True)
-    df_z.drop(my_list, axis = 1, inplace = True)
-    df_smse.drop(my_list, axis = 0, inplace = True)
 
 
 # In[16]:
@@ -320,8 +284,6 @@ if compute_perm_stats:
             permdir = os.path.join(os.environ['NORMATIVEDIR'], 'perm_all/perm_' + str(j))
             z_file = os.path.join(permdir, 'Z.txt')
             z_p = np.loadtxt(z_file, delimiter = ' ').transpose()
-            if parc_str == 'lausanne':
-                z_p = z_p[:,~my_bol] # drop subcortex from ct
             z_p[:,nm_is_pos.values] = z_p[:,nm_is_pos.values] * -1
             z_p = pd.DataFrame(data = z_p, index = df_z.index, columns = df_z.columns)
             df_corr_input = pd.concat((df.loc[:,phenos], z_p), axis = 1)
@@ -702,10 +664,7 @@ from brain_plot_func import roi_to_vtx, brain_plot
 # In[47]:
 
 
-if parc_str == 'schaefer':
-    subject_id = 'fsaverage'
-elif parc_str == 'lausanne':
-    subject_id = 'lausanne125'
+subject_id = 'fsaverage'
 
 
 # In[48]:
@@ -731,17 +690,10 @@ for pheno in phenos[5:]:
             roi_data[~sig] = -1000
 
             if any(sig):
-                if subject_id == 'lausanne125':
-                    parc_file = os.path.join('/Applications/freesurfer/subjects/', subject_id, 'label', hemi + '.myaparc_' + str(parc_scale) + '.annot')
-                elif subject_id == 'fsaverage':
-                    parc_file = os.path.join('/Users/lindenmp/Dropbox/Work/ResProjects/NormativeNeuroDev_CrossSec/figs_support/Parcellations/FreeSurfer5.3/fsaverage/label/',
+                parc_file = os.path.join('/Users/lindenmp/Dropbox/Work/ResProjects/NormativeNeuroDev_CrossSec/figs_support/Parcellations/FreeSurfer5.3/fsaverage/label/',
                                              hemi + '.Schaefer2018_' + str(parc_scale) + 'Parcels_17Networks_order.annot')
-
                 # project subject's data to vertices
-                if subject_id == 'lausanne125' and metric == 'ct':
-                    brain_plot(roi_data, parcel_names[parcel_loc == 1], parc_file, fig_str, subject_id = subject_id, hemi = hemi)
-                else:
-                    brain_plot(roi_data, parcel_names, parc_file, fig_str, subject_id = subject_id, hemi = hemi)
+                brain_plot(roi_data, parcel_names, parc_file, fig_str, subject_id = subject_id, hemi = hemi)
             else:
                 print('Nothing significant')
 
