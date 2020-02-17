@@ -20,9 +20,9 @@ import ptitprince as pt
 # In[2]:
 
 
-sys.path.append('/Users/lindenmp/Dropbox/Work/ResProjects/NormativeNeuroDev_CrossSec/code/func/')
+sys.path.append('/Users/lindenmp/Dropbox/Work/ResProjects/NormativeNeuroDev_CrossSec_T1/code/func/')
 from proj_environment import set_proj_env
-from func import run_corr, get_fdr_p, update_progress, get_null_p, get_cmap, get_fdr_p_df, get_sys_summary, prop_bar_plot
+from func import run_corr, get_fdr_p, update_progress, get_null_p, get_cmap, get_fdr_p_df, get_sys_summary, prop_bar_plot, dependent_corr
 
 
 # In[3]:
@@ -44,7 +44,7 @@ parcel_names, parcel_loc, drop_parcels, num_parcels, yeo_idx, yeo_labels = set_p
 sns.set(style='white', context = 'paper', font_scale = 1)
 
 
-# In[6]:
+# In[5]:
 
 
 run_correlations = True
@@ -52,22 +52,22 @@ compute_perm_stats = False
 num_perms = 1000
 
 
-# In[7]:
+# In[6]:
 
 
 os.environ['NORMATIVEDIR']
 
 
-# In[8]:
+# In[7]:
 
 
-metrics = ('ct', 'str', 'ac', 'mc')
+metrics = ('ct', 'vol')
 phenos = ('Overall_Psychopathology','Psychosis_Positive','Psychosis_NegativeDisorg','AnxiousMisery','Externalizing','Fear')
 
 
 # ## Load data pre-nispat data
 
-# In[9]:
+# In[8]:
 
 
 # Train
@@ -83,9 +83,53 @@ df_node = pd.read_csv(os.path.join(os.environ['NORMATIVEDIR'], 'resp_test.csv'))
 df_node.set_index(['bblid', 'scanid'], inplace = True)
 
 
-# ## Age effects
+# ### Regress age/sex out of psychopathology phenotypes and node features (not deviations)
+
+# In[9]:
+
+
+df_nuis = df.loc[:,[primary_covariate,'sex_adj']]
+df_nuis = sm.add_constant(df_nuis)
+
+# phenos
+mdl = sm.OLS(df.loc[:,phenos], df_nuis).fit()
+y_pred = mdl.predict(df_nuis)
+y_pred.columns = phenos
+df.loc[:,phenos] = df.loc[:,phenos] - y_pred
+
+# df_node
+cols = df_node.columns
+mdl = sm.OLS(df_node.loc[:,cols], df_nuis).fit()
+y_pred = mdl.predict(df_nuis)
+y_pred.columns = cols
+df_node.loc[:,cols] = df_node.loc[:,cols] - y_pred
+
 
 # In[10]:
+
+
+# phenos = ('Overall_Psychopathology','Psychosis_Positive')
+# phenos = ('Psychosis_NegativeDisorg','AnxiousMisery')
+# phenos = ('Externalizing','Fear')
+
+
+# ## Age effects
+
+# In[11]:
+
+
+# regress out sex
+df_nuis = df_train.loc[:,'sex_adj']
+df_nuis = sm.add_constant(df_nuis)
+
+cols = df_node_train.columns
+mdl = sm.OLS(df_node_train.loc[:,cols].astype(float), df_nuis.astype(float)).fit()
+y_pred = mdl.predict(df_nuis)
+y_pred.columns = cols
+df_node_train.loc[:,cols] = df_node_train.loc[:,cols] - y_pred
+
+
+# In[12]:
 
 
 # age effect on training set
@@ -94,7 +138,7 @@ age_alpha = 0.05
 age_filter = df_age_effect['p_fdr'].values < age_alpha
 
 
-# In[11]:
+# In[13]:
 
 
 age_filter.sum()
@@ -102,18 +146,7 @@ age_filter.sum()
 
 # ## Load nispat outputs
 
-# In[12]:
-
-
-# Forward model
-synth_cov_test = pd.read_csv(os.path.join(os.environ['NORMATIVEDIR'], 'forward/synth_cov_test.txt'),
-                             delim_whitespace = True, names=[primary_covariate, 'sex_adj'])
-
-yhat_forward = np.loadtxt(os.path.join(os.environ['NORMATIVEDIR'], 'forward/yhat.txt'), delimiter = ' ').transpose()
-df_yhat_forward = pd.DataFrame(data = yhat_forward, index = synth_cov_test.index, columns = df_node.columns)
-
-
-# In[13]:
+# In[14]:
 
 
 smse = np.loadtxt(os.path.join(os.environ['NORMATIVEDIR'], 'smse.txt'), delimiter = ' ').transpose()
@@ -123,7 +156,7 @@ z = np.loadtxt(os.path.join(os.environ['NORMATIVEDIR'], 'Z.txt'), delimiter = ' 
 df_z = pd.DataFrame(data = z, index = df_node.index, columns = df_node.columns)
 
 
-# In[16]:
+# In[15]:
 
 
 smse_thresh = 1
@@ -131,10 +164,17 @@ smse_filter = df_smse.values < smse_thresh
 smse_filter = smse_filter.reshape(-1)
 
 
-# In[17]:
+# In[16]:
 
 
 smse_filter.sum()
+
+
+# In[17]:
+
+
+region_filter = np.logical_and(age_filter,smse_filter)
+region_filter.sum()
 
 
 # ### The interpretation of the z-deviations varies as a function of the age-effect from which the normative model is primarily derived.
@@ -146,15 +186,9 @@ smse_filter.sum()
 # In[18]:
 
 
-# at each roi, the differences between first and last age point in the synthetic data
-# for each node/metric, a negative value means that the nm predicted an overall decrease in y with age (i.e, a negative function),
-# while a positive values means that the nm predicted an overall increase in y with age (i.e., a positive function)
-df_yhat_tmp1 = df_yhat_forward[synth_cov_test['sex_adj'] == 0].iloc[-1,:] - df_yhat_forward[synth_cov_test['sex_adj'] == 0].iloc[0,:]
-df_yhat_tmp2 = df_yhat_forward[synth_cov_test['sex_adj'] == 1].iloc[-1,:] - df_yhat_forward[synth_cov_test['sex_adj'] == 1].iloc[0,:]
-df_yhat_diff = pd.concat((df_yhat_tmp1, df_yhat_tmp2), axis = 1)
-
 # boolean that designates which regions carry with positive predicted change.
-nm_is_pos = df_yhat_diff[0] > 0
+nm_is_pos = df_age_effect['coef'] > 0
+print(nm_is_pos.sum())
 
 # flipping the z-stats in these regions has the effect of standardising their interpration across the brain to be inline
 # with the negative predicted change statement above
@@ -169,15 +203,6 @@ df_z.loc[:,nm_is_pos] = df_z.loc[:,nm_is_pos] * -1
 if run_correlations:
     df_pheno = pd.DataFrame(columns = ['pheno','node','coef', 'p'])
     df_corr_input = pd.concat((df.loc[:,phenos], df_node), axis = 1)
-
-    # regress out age
-    df_nuis = df[primary_covariate]
-    df_nuis = sm.add_constant(df_nuis)
-    cols = df_corr_input.columns
-    mdl = sm.OLS(df_corr_input.loc[:,cols].astype(float), df_nuis.astype(float)).fit()
-    y_pred = mdl.predict(df_nuis)
-    y_pred.columns = cols
-    df_corr_input.loc[:,cols] = df_corr_input.loc[:,cols] - y_pred
 
     for pheno in phenos:
         print(pheno)
@@ -201,17 +226,7 @@ if compute_perm_stats:
         # Set seed for reproducibility
         np.random.seed(0)
         null = np.zeros((df_node.shape[1],num_perms))
-
         df_tmp = pd.concat((df.loc[:,phenos], df_node), axis = 1)
-
-        # regress out age
-        df_nuis = df[primary_covariate]
-        df_nuis = sm.add_constant(df_nuis)
-        cols = df_tmp.columns
-        mdl = sm.OLS(df_tmp.loc[:,cols].astype(float), df_nuis.astype(float)).fit()
-        y_pred = mdl.predict(df_nuis)
-        y_pred.columns = cols
-        df_tmp.loc[:,cols] = df_tmp.loc[:,cols] - y_pred
                                       
         for j in range(num_perms):
             update_progress(j / num_perms, pheno)
@@ -221,40 +236,29 @@ if compute_perm_stats:
                 null[i,j] = sp.stats.spearmanr(df_corr_input[pheno], df_corr_input[col])[0]
 
         update_progress(1, pheno)
-        np.save(os.path.join(os.environ['NORMATIVEDIR'], 'null_' + pheno + '_m_spear_ols_res'), null)
+        np.save(os.path.join(os.environ['NORMATIVEDIR'], 'null_' + pheno + '_m'), null)
 
-    nulls = {'Overall_Psychopathology': np.load(os.path.join(os.environ['NORMATIVEDIR'], 'null_Overall_Psychopathology_m_spear_ols_res.npy')),
-            'Psychosis_Positive': np.load(os.path.join(os.environ['NORMATIVEDIR'], 'null_Psychosis_Positive_m_spear_ols_res.npy')),
-            'Psychosis_NegativeDisorg': np.load(os.path.join(os.environ['NORMATIVEDIR'], 'null_Psychosis_NegativeDisorg_m_spear_ols_res.npy')),
-            'AnxiousMisery': np.load(os.path.join(os.environ['NORMATIVEDIR'], 'null_AnxiousMisery_m_spear_ols_res.npy')),
-            'Externalizing': np.load(os.path.join(os.environ['NORMATIVEDIR'], 'null_Externalizing_m_spear_ols_res.npy')),
-            'Fear': np.load(os.path.join(os.environ['NORMATIVEDIR'], 'null_Fear_m_spear_ols_res.npy'))}
-else:
-    nulls = {'Overall_Psychopathology': np.load(os.path.join(os.environ['NORMATIVEDIR'], 'null_Overall_Psychopathology_m_spear_ols_res.npy')),
-            'Psychosis_Positive': np.load(os.path.join(os.environ['NORMATIVEDIR'], 'null_Psychosis_Positive_m_spear_ols_res.npy')),
-            'Psychosis_NegativeDisorg': np.load(os.path.join(os.environ['NORMATIVEDIR'], 'null_Psychosis_NegativeDisorg_m_spear_ols_res.npy')),
-            'AnxiousMisery': np.load(os.path.join(os.environ['NORMATIVEDIR'], 'null_AnxiousMisery_m_spear_ols_res.npy')),
-            'Externalizing': np.load(os.path.join(os.environ['NORMATIVEDIR'], 'null_Externalizing_m_spear_ols_res.npy')),
-            'Fear': np.load(os.path.join(os.environ['NORMATIVEDIR'], 'null_Fear_m_spear_ols_res.npy'))}
+
+# In[21]:
+
+
+if compute_perm_stats == False:
+    nulls = {'Overall_Psychopathology': np.load(os.path.join(os.environ['NORMATIVEDIR'], 'null_Overall_Psychopathology_m.npy')),
+            'Psychosis_Positive': np.load(os.path.join(os.environ['NORMATIVEDIR'], 'null_Psychosis_Positive_m.npy')),
+            'Psychosis_NegativeDisorg': np.load(os.path.join(os.environ['NORMATIVEDIR'], 'null_Psychosis_NegativeDisorg_m.npy')),
+            'AnxiousMisery': np.load(os.path.join(os.environ['NORMATIVEDIR'], 'null_AnxiousMisery_m.npy')),
+            'Externalizing': np.load(os.path.join(os.environ['NORMATIVEDIR'], 'null_Externalizing_m.npy')),
+            'Fear': np.load(os.path.join(os.environ['NORMATIVEDIR'], 'null_Fear_m.npy'))}
 
 
 # ## Get pheno-nispat relationships
 
-# In[21]:
+# In[22]:
 
 
 if run_correlations:
     df_pheno_z = pd.DataFrame(columns = ['pheno','node','coef', 'p'])
     df_corr_input = pd.concat((df.loc[:,phenos], df_z), axis = 1)
-
-    # regress out age
-    df_nuis = df[primary_covariate]
-    df_nuis = sm.add_constant(df_nuis)
-    cols = df_corr_input.columns
-    mdl = sm.OLS(df_corr_input.loc[:,cols].astype(float), df_nuis.astype(float)).fit()
-    y_pred = mdl.predict(df_nuis)
-    y_pred.columns = cols
-    df_corr_input.loc[:,cols] = df_corr_input.loc[:,cols] - y_pred
 
     for pheno in phenos:
         print(pheno)
@@ -271,7 +275,7 @@ if run_correlations:
 
 # ### Get null for pheno-nispat 
 
-# In[22]:
+# In[23]:
 
 
 if compute_perm_stats:
@@ -287,46 +291,47 @@ if compute_perm_stats:
             z_p[:,nm_is_pos.values] = z_p[:,nm_is_pos.values] * -1
             z_p = pd.DataFrame(data = z_p, index = df_z.index, columns = df_z.columns)
             df_corr_input = pd.concat((df.loc[:,phenos], z_p), axis = 1)
-
-            # regress out age
-            df_nuis = df[primary_covariate]
-            df_nuis = sm.add_constant(df_nuis)
-            cols = df_corr_input.columns
-            mdl = sm.OLS(df_corr_input.loc[:,cols].astype(float), df_nuis.astype(float)).fit()
-            y_pred = mdl.predict(df_nuis)
-            y_pred.columns = cols
-            df_corr_input.loc[:,cols] = df_corr_input.loc[:,cols] - y_pred
             
             for i, col in enumerate(df_z.columns):
                 null[i,j] = sp.stats.spearmanr(df_corr_input[pheno], df_corr_input[col])[0]
         update_progress(1, pheno)
 
-        np.save(os.path.join(os.environ['NORMATIVEDIR'], 'null_' + pheno + '_zp_all_spear_ols_res'), null)
-
-    nulls_z = {'Overall_Psychopathology': np.load(os.path.join(os.environ['NORMATIVEDIR'], 'null_Overall_Psychopathology_zp_all_spear_ols_res.npy')),
-            'Psychosis_Positive': np.load(os.path.join(os.environ['NORMATIVEDIR'], 'null_Psychosis_Positive_zp_all_spear_ols_res.npy')),
-            'Psychosis_NegativeDisorg': np.load(os.path.join(os.environ['NORMATIVEDIR'], 'null_Psychosis_NegativeDisorg_zp_all_spear_ols_res.npy')),
-            'AnxiousMisery': np.load(os.path.join(os.environ['NORMATIVEDIR'], 'null_AnxiousMisery_zp_all_spear_ols_res.npy')),
-            'Externalizing': np.load(os.path.join(os.environ['NORMATIVEDIR'], 'null_Externalizing_zp_all_spear_ols_res.npy')),
-            'Fear': np.load(os.path.join(os.environ['NORMATIVEDIR'], 'null_Fear_zp_all_spear_ols_res.npy'))}    
-else:
-    nulls_z = {'Overall_Psychopathology': np.load(os.path.join(os.environ['NORMATIVEDIR'], 'null_Overall_Psychopathology_zp_all_spear_ols_res.npy')),
-        'Psychosis_Positive': np.load(os.path.join(os.environ['NORMATIVEDIR'], 'null_Psychosis_Positive_zp_all_spear_ols_res.npy')),
-        'Psychosis_NegativeDisorg': np.load(os.path.join(os.environ['NORMATIVEDIR'], 'null_Psychosis_NegativeDisorg_zp_all_spear_ols_res.npy')),
-        'AnxiousMisery': np.load(os.path.join(os.environ['NORMATIVEDIR'], 'null_AnxiousMisery_zp_all_spear_ols_res.npy')),
-        'Externalizing': np.load(os.path.join(os.environ['NORMATIVEDIR'], 'null_Externalizing_zp_all_spear_ols_res.npy')),
-        'Fear': np.load(os.path.join(os.environ['NORMATIVEDIR'], 'null_Fear_zp_all_spear_ols_res.npy'))}
-
-
-# In[23]:
-
-
-for pheno in phenos:
-    nulls_z[pheno][np.isnan(nulls_z[pheno])] = 0
-    sns.distplot(nulls_z[pheno].reshape(-1,1))
+        np.save(os.path.join(os.environ['NORMATIVEDIR'], 'null_' + pheno + '_z_pheno-res'), null)
 
 
 # In[24]:
+
+
+if compute_perm_stats == False:
+    nulls_z = {'Overall_Psychopathology': np.load(os.path.join(os.environ['NORMATIVEDIR'], 'null_Overall_Psychopathology_z_pheno-res.npy')),
+        'Psychosis_Positive': np.load(os.path.join(os.environ['NORMATIVEDIR'], 'null_Psychosis_Positive_z_pheno-res.npy')),
+        'Psychosis_NegativeDisorg': np.load(os.path.join(os.environ['NORMATIVEDIR'], 'null_Psychosis_NegativeDisorg_z_pheno-res.npy')),
+        'AnxiousMisery': np.load(os.path.join(os.environ['NORMATIVEDIR'], 'null_AnxiousMisery_z_pheno-res.npy')),
+        'Externalizing': np.load(os.path.join(os.environ['NORMATIVEDIR'], 'null_Externalizing_z_pheno-res.npy')),
+        'Fear': np.load(os.path.join(os.environ['NORMATIVEDIR'], 'null_Fear_z_pheno-res.npy'))}
+
+
+# In[25]:
+
+
+f, ax = plt.subplots(1,len(metrics))
+f.set_figwidth(15)
+f.set_figheight(5)
+for i, metric in enumerate(metrics):
+    for pheno in phenos:
+#         null = nulls[pheno]
+        null = nulls_z[pheno]
+        idx = [any(b in s for b in metric) for s in list(df_z.columns)]
+        null = null[idx,:]
+        # collapse all regions
+#         sns.distplot(np.abs(null.reshape(-1,1)[~np.isnan(null.reshape(-1,1))]), ax = ax[i])
+        # pick a region
+        sns.distplot(np.abs(null[0,:]), ax = ax[i])
+    
+    ax[i].legend(phenos)
+
+
+# In[26]:
 
 
 if run_correlations == False:
@@ -337,33 +342,33 @@ if run_correlations == False:
     df_pheno_z.set_index(['pheno','node'], inplace = True)
 
 
-# In[25]:
+# In[27]:
 
 
 for pheno in phenos:
-    df_pheno.loc[pheno,'p_perm'] = get_null_p(df_pheno.loc[pheno,'coef'].values, nulls[pheno])    
-    df_pheno.loc[pheno,'p_perm_fdr'] = get_fdr_p(df_pheno.loc[pheno,'p_perm'])
+    df_pheno.loc[pheno,'p_perm'] = get_null_p(df_pheno.loc[pheno,'coef'].values, nulls[pheno])
+df_pheno.loc[:,'p_perm_fdr'] = get_fdr_p(df_pheno.loc[:,'p_perm'])
 print(str(np.sum(df_pheno['p_perm_fdr'] < .05)) + ' significant effects (fdr)')
 
 
-# In[26]:
+# In[28]:
 
 
 for pheno in phenos:
     df_pheno_z.loc[pheno,'p_perm'] = get_null_p(df_pheno_z.loc[pheno,'coef'].values, nulls_z[pheno])    
-    df_pheno_z.loc[pheno,'p_perm_fdr'] = get_fdr_p(df_pheno_z.loc[pheno,'p_perm'])
+df_pheno_z.loc[:,'p_perm_fdr'] = get_fdr_p(df_pheno_z.loc[:,'p_perm'])
 print(str(np.sum(df_pheno_z['p_perm_fdr'] < .05)) + ' significant effects (fdr)')
 
 
-# In[27]:
+# In[29]:
 
 
-alpha = 0.05/len(phenos)
+alpha = 0.05
 print(len(phenos))
 print(alpha)
 
 
-# In[28]:
+# In[30]:
 
 
 x = df_pheno['p_perm_fdr'].values < alpha
@@ -396,21 +401,21 @@ print(str(np.sum(df_pheno_z['sig_age'] == True)) + ' significant effects (fdr)')
 print(str(np.sum(df_pheno_z['sig_age_smse'] == True)) + ' significant effects (fdr)')
 
 
-# In[29]:
+# In[31]:
 
 
 for pheno in phenos:
     print(pheno + ': ' + str(np.sum(df_pheno.loc[pheno]['sig_age_smse'] == True)) + ' significant effects (fdr)')
 
 
-# In[30]:
+# In[32]:
 
 
 for pheno in phenos:
     print(pheno + ': ' + str(np.sum(df_pheno_z.loc[pheno]['sig_age_smse'] == True)) + ' significant effects (fdr)')
 
 
-# In[31]:
+# In[33]:
 
 
 df_pheno.to_csv(os.path.join(os.environ['NORMATIVEDIR'], 'df_corr_pheno.csv'))
@@ -419,7 +424,7 @@ df_pheno_z.to_csv(os.path.join(os.environ['NORMATIVEDIR'], 'df_corr_pheno_z.csv'
 
 # # Plots
 
-# In[32]:
+# In[34]:
 
 
 if not os.path.exists(os.environ['FIGDIR']): os.makedirs(os.environ['FIGDIR'])
@@ -430,18 +435,9 @@ cmap = get_cmap('pair')
 phenos = ('Overall_Psychopathology','Psychosis_Positive','Psychosis_NegativeDisorg','AnxiousMisery','Externalizing','Fear')
 phenos_label_short = ('Ov. Psych.', 'Psy. (pos.)', 'Psy. (neg.)', 'Anx.-mis.', 'Ext.', 'Fear')
 phenos_label = ('Overall Psychopathology','Psychosis (Positive)','Psychosis (Negative)','Anxious-Misery','Externalizing','Fear')
-metrics = ('ct', 'str', 'ac', 'mc')
-metrics_label_short = ('Thickness', 'Strength', 'Ave. ctrb.', 'Mod. ctrb.')
-metrics_label = ('Thickness', 'Strength', 'Average controllability', 'Modal controllability')
-
-# For sensitivity analyses
-# metrics = ('str', 'ac', 'mc')
-# metrics_label_short = ('Strength', 'Ave. ctrb.', 'Mod. ctrb.')
-# metrics_label = ('Strength', 'Average controllability', 'Modal controllability')
-
-# metrics = ('ac', 'mc')
-# metrics_label_short = ('Ave. ctrb.', 'Mod. ctrb.')
-# metrics_label = ('Average controllability', 'Modal controllability')
+metrics = ('ct', 'vol')
+metrics_label_short = ('Thickness', 'Volume')
+metrics_label = ('Thickness', 'Volume')
 
 print(phenos)
 print(metrics)
@@ -454,7 +450,7 @@ for metric in metrics:
 
 # ## Number of sig effects
 
-# In[33]:
+# In[35]:
 
 
 arrays = [tuple(['pre-nm'] * len(metrics) + ['nm'] * len(metrics)), metrics + metrics]
@@ -463,7 +459,7 @@ pos_counts = pd.DataFrame(index = my_index, columns = phenos)
 neg_counts = pd.DataFrame(index = my_index, columns = phenos)
 
 
-# In[34]:
+# In[36]:
 
 
 for pheno in phenos:
@@ -474,21 +470,21 @@ for pheno in phenos:
         region_filt = np.logical_and(age_filt,smse_filt)
         
         df_tmp = df_pheno.loc[pheno,['coef','sig_age_smse']].filter(regex = metric, axis = 0).copy()
-        pos_counts.loc[('pre-nm',metric),pheno] = df_tmp.loc[df_tmp['coef']>0,'sig_age_smse'].sum() / region_filt.sum()*100
-        neg_counts.loc[('pre-nm',metric),pheno] = df_tmp.loc[df_tmp['coef']<0,'sig_age_smse'].sum() / region_filt.sum()*100
+        pos_counts.loc[('pre-nm',metric),pheno] = df_tmp.loc[df_tmp['coef']>0,'sig_age_smse'].sum() / num_parcels*100
+        neg_counts.loc[('pre-nm',metric),pheno] = df_tmp.loc[df_tmp['coef']<0,'sig_age_smse'].sum() / num_parcels*100
         
         df_tmp = df_pheno_z.loc[pheno,['coef','sig_age_smse']].filter(regex = metric, axis = 0).copy()
-        pos_counts.loc[('nm',metric),pheno] = df_tmp.loc[df_tmp['coef']>0,'sig_age_smse'].sum() / region_filt.sum()*100
-        neg_counts.loc[('nm',metric),pheno] = df_tmp.loc[df_tmp['coef']<0,'sig_age_smse'].sum() / region_filt.sum()*100
+        pos_counts.loc[('nm',metric),pheno] = df_tmp.loc[df_tmp['coef']>0,'sig_age_smse'].sum() / num_parcels*100
+        neg_counts.loc[('nm',metric),pheno] = df_tmp.loc[df_tmp['coef']<0,'sig_age_smse'].sum() / num_parcels*100
 
 
-# In[35]:
+# In[37]:
 
 
 pos_counts
 
 
-# In[36]:
+# In[38]:
 
 
 if np.max(pos_counts.values) > np.max(neg_counts.values):
@@ -502,7 +498,7 @@ print(plot_max)
 
 # Figure 3A
 
-# In[37]:
+# In[39]:
 
 
 f, ax = plt.subplots()
@@ -515,7 +511,7 @@ ax.set_ylabel('')
 f.savefig('pos_count.svg', dpi = 300, bbox_inches = 'tight', pad_inches = 0)
 
 
-# In[38]:
+# In[40]:
 
 
 f, ax = plt.subplots()
@@ -528,97 +524,45 @@ ax.set_ylabel('')
 f.savefig('neg_count.svg', dpi = 300, bbox_inches = 'tight', pad_inches = 0)
 
 
-# ## t-tests on distributions of coefficients
-
-# In[39]:
-
-
-desc = pd.DataFrame(index = metrics, columns = phenos)
-stats = pd.DataFrame(index = metrics, columns = phenos)
-p = pd.DataFrame(index = metrics, columns = phenos)
-
-for pheno in phenos:
-    for metric in metrics:
-        x = df_pheno_z.loc[pheno].loc[:,'coef'].filter(regex = metric, axis = 0)
-        y = df_pheno.loc[pheno].loc[:,'coef'].filter(regex = metric, axis = 0)
-        
-        age_filt = df_age_effect.filter(regex = metric, axis = 0)['p_fdr'].values < age_alpha
-        smse_filt = df_smse.filter(regex = metric, axis = 0).values < smse_thresh
-        smse_filt = smse_filt.reshape(-1)
-        region_filt = np.logical_and(age_filt,smse_filt)
-        
-        x = x[region_filt]; y = y[region_filt]
-        desc.loc[metric,pheno] = np.median(x - y)
-        
-        stats.loc[metric,pheno] = sp.stats.wilcoxon(x, y)[0]
-        p.loc[metric,pheno] = sp.stats.wilcoxon(x, y)[1] 
-        
-p = get_fdr_p_df(p)
-
-
-# In[40]:
-
-
-desc[p < 0.05]
-
-
 # In[41]:
 
 
-stats[p < 0.05]
+num_sig_regions = pd.DataFrame(index = metrics, columns = phenos)
+counts_greater = pd.DataFrame(index = metrics, columns = phenos)
+counts_smaller = pd.DataFrame(index = metrics, columns = phenos)
 
+for i, metric in enumerate(metrics):
+    for j, pheno in enumerate(phenos):
+        df_tmp = df_pheno.loc[pheno,['coef','sig_age_smse']].filter(regex = metric, axis = 0).copy()
+        df_tmp_z = df_pheno_z.loc[pheno,['coef','sig_age_smse']].filter(regex = metric, axis = 0).copy()
+        
+        count_great = 0
+        count_small = 0
+        for col, _ in df_tmp_z.loc[df_tmp_z['sig_age_smse'],:].iterrows():
+#         for col, _ in df_tmp.loc[df_tmp['sig_age_smse'],:].iterrows():
+            xy = np.abs(df_tmp_z.loc[col,'coef']) # correlation between phenotype and deviation
+            xz = np.abs(df_tmp.loc[col,'coef']) # correlation between phenotype and brain feature
+            yz = np.abs(sp.stats.spearmanr(df_node[col],df_z[col])[0]) # correlation deviation and brain feature
+            r = dependent_corr(xy, xz, yz, df_z.shape[0], twotailed=True) # test for difference between correlations
+            if r[0] > 0 and r[1] < .05: # if difference is positive and significant, then normative analysis yielded bigger effect size
+                count_great += 1
+            elif r[0] < 0 and r[1] < .05: # if difference is negative and significant, then normative analysis yielded smaller effect size
+                count_small += 1
+        # store
+        counts_greater.loc[metric,pheno] = count_great
+        counts_smaller.loc[metric,pheno] = count_small
 
-# ## RainCloudPlots
-
-# Plot = phenotype. Group = metric. Repeated measure = pre-nm/nisapt
 
 # In[42]:
 
 
-region_filter = np.logical_and(age_filter,smse_filter)
-region_filter.sum()
+counts_greater
 
-
-# Figure 3
 
 # In[43]:
 
 
-for i, pheno in enumerate(phenos):
-    print(pheno)
-    # nispat
-    df1 = df_pheno.loc[pheno].reset_index()
-    df1 = df1.loc[df1['node'].isin(metrics_labels),:]
-    for metric in metrics:
-        df1.replace(to_replace=metric+'.*$', value=metric, regex = True, inplace = True)
-    df1['analysis'] = 'pre-nm'
-    df1 = df1.loc[region_filter,:]
-
-    # nispat
-    df2 = df_pheno_z.loc[pheno].reset_index()
-    df2 = df2.loc[df2['node'].isin(metrics_labels),:]
-    for metric in metrics:
-        df2.replace(to_replace=metric+'.*$', value=metric, regex = True, inplace = True)
-    df2['analysis'] = 'nm'
-    df2 = df2.loc[region_filter,:]
-
-    df_rc = pd.concat((df1,df2), axis = 0)
-#     df_rc['coef'] = df_rc['coef'].abs()
-
-    # RainCloudPlot
-    dx = 'node'; dy = 'coef'; dhue = "analysis"
-    ort = 'h'; sigma = 0.25
-    ax = pt.RainCloud(x = dx, y = dy, hue = dhue, data = df_rc, palette = cmap, bw = sigma, width_viol = 0.7, width_box=0.2,
-                    figsize = (2.25,4), orient = ort, alpha = .5, dodge = True, pointplot = False, move = 0.25)
-#                     figsize = (2.25,2), orient = ort, alpha = .5, dodge = True, pointplot = False, move = 0.25)
-    ax.get_legend().remove()
-    ax.set_title(phenos_label[i])
-    ax.set_ylabel('')
-    ax.set_yticklabels('')
-    ax.set_yticklabels(metrics_label_short)
-    ax.set_xlabel('Spearman Rho ($\\rho$)')
-#     ax.set_xlabel('$\\rho$ (absolute)')
-    plt.savefig('raincloud_'+pheno+'.svg', dpi = 300, bbox_inches = 'tight', pad_inches = 0)
+counts_smaller
 
 
 # ## Summarise effects over Yeo networks
@@ -678,8 +622,8 @@ get_ipython().run_line_magic('pylab', 'qt')
 # In[49]:
 
 
-for pheno in phenos[5:]:
-    for metric in metrics[0],:
+for pheno in phenos:
+    for metric in metrics:
         for hemi in ('lh', 'rh'):
             print(pheno, metric)
             # Plots of univariate pheno correlation
@@ -714,7 +658,7 @@ f.set_figwidth(4)
 f.set_figheight(4)
 plt.subplots_adjust(wspace=0, hspace=0)
 
-pheno = phenos[5]; print(pheno)
+pheno = phenos[0]; print(pheno)
 metric = metrics[0]; print(metric)
 # column 0:
 fig_str = 'lh_'+pheno+'_'+metric+'_z.png'
