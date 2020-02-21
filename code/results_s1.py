@@ -13,12 +13,13 @@ import scipy as sp
 from scipy import stats
 import seaborn as sns
 import matplotlib.pyplot as plt
+import statsmodels.api as sm
 
 
 # In[2]:
 
 
-sys.path.append('/Users/lindenmp/Dropbox/Work/ResProjects/NormativeNeuroDev_CrossSec/code/func/')
+sys.path.append('/Users/lindenmp/Dropbox/Work/ResProjects/NormativeNeuroDev_CrossSec_T1/code/func/')
 from proj_environment import set_proj_env
 from func import run_corr, get_fdr_p, get_cmap
 
@@ -28,11 +29,12 @@ from func import run_corr, get_fdr_p, get_cmap
 
 train_test_str = 'squeakycleanExclude' # 'squeakycleanExclude' 'trte_psychopathology'
 exclude_str = 't1Exclude' # 't1Exclude' 'fsFinalExclude'
-parc_str = 'schaefer' # 'schaefer' 'lausanne'
+parc_str = 'schaefer'
 parc_scale = 400 # 125 400
 primary_covariate = 'ageAtScan1_Years'
+extra_str = ''
 parcel_names, parcel_loc, drop_parcels, num_parcels, yeo_idx, yeo_labels = set_proj_env(train_test_str = train_test_str, exclude_str = exclude_str,
-                                                                            parc_str = parc_str, parc_scale = parc_scale)
+                                                                            parc_str = parc_str, parc_scale = parc_scale, extra_str = extra_str)
 
 
 # In[4]:
@@ -68,15 +70,27 @@ df_node = pd.concat([df_node_train, df_node_test])
 # In[6]:
 
 
+# regress out sex
+df_nuis = df_train.loc[:,'sex_adj']
+df_nuis = sm.add_constant(df_nuis)
+
+cols = df_node_train.columns
+mdl = sm.OLS(df_node_train.loc[:,cols].astype(float), df_nuis.astype(float)).fit()
+y_pred = mdl.predict(df_nuis)
+y_pred.columns = cols
+df_node_train.loc[:,cols] = df_node_train.loc[:,cols] - y_pred
+
+
+# In[7]:
+
+
 # age effect on training set
 df_age_effect = run_corr(df_train[primary_covariate], df_node_train, typ = 'spearmanr'); df_age_effect['p_fdr'] = get_fdr_p(df_age_effect['p'])
-if parc_str == 'lausanne':
-    df_age_effect.drop(my_list, axis = 0, inplace = True)
 age_alpha = 0.05
 age_filter = df_age_effect['p_fdr'].values < age_alpha
 
 
-# In[7]:
+# In[8]:
 
 
 age_filter.sum()
@@ -84,7 +98,7 @@ age_filter.sum()
 
 # ## Load nispat outputs
 
-# In[8]:
+# In[9]:
 
 
 # Forward model
@@ -98,14 +112,14 @@ ys2_forward = np.loadtxt(os.path.join(os.environ['NORMATIVEDIR'], 'forward/ys2.t
 df_ys2_forward = pd.DataFrame(data = ys2_forward, index = synth_cov_test.index, columns = df_node.columns)
 
 
-# In[9]:
+# In[10]:
 
 
 smse = np.loadtxt(os.path.join(os.environ['NORMATIVEDIR'], 'smse.txt'), delimiter = ' ').transpose()
 df_smse = pd.DataFrame(data = smse, index = df_node.columns)
 
 
-# In[10]:
+# In[11]:
 
 
 smse_thresh = 1
@@ -113,13 +127,13 @@ smse_filter = df_smse.values < smse_thresh
 smse_filter = smse_filter.reshape(-1)
 
 
-# In[11]:
+# In[12]:
 
 
 smse_filter.sum()
 
 
-# In[12]:
+# In[13]:
 
 
 df_yhat_forward_tmp = df_yhat_forward + (df_yhat_forward.abs().max()+1)
@@ -146,7 +160,7 @@ df_yhat_diff.head()
 
 # # Plots
 
-# In[13]:
+# In[14]:
 
 
 if not os.path.exists(os.environ['FIGDIR']): os.makedirs(os.environ['FIGDIR'])
@@ -154,31 +168,28 @@ os.chdir(os.environ['FIGDIR'])
 sns.set(style='white', context = 'paper', font_scale = 1)
 cmap = get_cmap('pair')
 
-metrics = ('ct', 'str', 'ac', 'mc')
-metrics_label_short = ('Thickness', 'Strength', 'Ave. ctrb.', 'Mod. ctrb.')
-metrics_label = ('Thickness', 'Strength', 'Average controllability', 'Modal controllability')
+metrics = ('ct', 'vol')
+metrics_label_short = ('Thickness', 'Volume')
+metrics_label = ('Thickness', 'Volume')
 print(metrics)
 
 
 # ## Brain plots nispat
 
-# In[14]:
+# In[15]:
 
 
 import matplotlib.image as mpimg
 from brain_plot_func import roi_to_vtx, brain_plot
 
 
-# In[15]:
-
-
-if parc_str == 'schaefer':
-    subject_id = 'fsaverage'
-elif parc_str == 'lausanne':
-    subject_id = 'lausanne125'
-
-
 # In[16]:
+
+
+subject_id = 'fsaverage'
+
+
+# In[17]:
 
 
 get_ipython().run_line_magic('pylab', 'qt')
@@ -186,7 +197,7 @@ get_ipython().run_line_magic('pylab', 'qt')
 
 # 0 = Male, 1 = Female
 
-# In[17]:
+# In[18]:
 
 
 for metric in metrics:
@@ -206,31 +217,21 @@ for metric in metrics:
             roi_data[~region_filt] = -1000
             if metric == 'ct':
                 center_anchor = 3
-            if metric == 'str':
-                center_anchor = 30
-            elif metric == 'ac':
-                center_anchor = 4
-            elif metric == 'mc':
-                center_anchor = 1
+            elif metric == 'vol':
+                center_anchor = 5
 
             if region_filt.any():
-                if subject_id == 'lausanne125':
-                    parc_file = os.path.join('/Applications/freesurfer/subjects/', subject_id, 'label', hemi + '.myaparc_' + str(parc_scale) + '.annot')
-                elif subject_id == 'fsaverage':
-                    parc_file = os.path.join('/Users/lindenmp/Dropbox/Work/ResProjects/NeuroDev_NetworkControl/figs/Parcellations/FreeSurfer5.3/fsaverage/label/',
-                                             hemi + '.Schaefer2018_' + str(parc_scale) + 'Parcels_17Networks_order.annot')
+                parc_file = os.path.join('/Users/lindenmp/Dropbox/Work/ResProjects/NeuroDev_NetworkControl/figs/Parcellations/FreeSurfer5.3/fsaverage/label/',
+                                         hemi + '.Schaefer2018_' + str(parc_scale) + 'Parcels_17Networks_order.annot')
 
-                if subject_id == 'lausanne125' and metric == 'ct':
-                    brain_plot(roi_data, parcel_names[parcel_loc == 1], parc_file, fig_str, subject_id = subject_id, hemi = hemi, color = 'coolwarm', center_anchor = center_anchor)
-                else:
-                    brain_plot(roi_data, parcel_names, parc_file, fig_str, subject_id = subject_id, hemi = hemi, color = 'coolwarm', center_anchor = center_anchor)
+                brain_plot(roi_data, parcel_names, parc_file, fig_str, subject_id = subject_id, hemi = hemi, color = 'coolwarm', center_anchor = center_anchor)
             else:
                 print('Nothing significant')
 
 
 # # Figures
 
-# In[18]:
+# In[19]:
 
 
 get_ipython().run_line_magic('matplotlib', 'inline')
@@ -238,211 +239,58 @@ get_ipython().run_line_magic('matplotlib', 'inline')
 
 # Figure 2C (top)
 
-# In[19]:
-
-
-# Age effects
-f, axes = plt.subplots(2, 4)
-# f.suptitle('age')
-f.set_figwidth(4)
-f.set_figheight(2)
-plt.subplots_adjust(wspace=0, hspace=0)
-
-my_str = '_sex1_frwd'
-# column 0:
-fig_str = 'lh_ct_age'+my_str+'.png'
-try:
-#     axes[0,0].set_title('Thickness (left)')
-    image = mpimg.imread('lat_' + fig_str); axes[0,0].imshow(image); axes[0,0].axis('off')
-except FileNotFoundError: axes[0,0].axis('off')
-try:
-    image = mpimg.imread('med_' + fig_str); axes[1,0].imshow(image); axes[1,0].axis('off')
-except FileNotFoundError: axes[1,0].axis('off')
-    
-# column 1:
-fig_str = 'rh_ct_age'+my_str+'.png'
-try:
-#     axes[0,1].set_title('Thickness (right)')
-    image = mpimg.imread('lat_' + fig_str); axes[0,1].imshow(image); axes[0,1].axis('off')
-except FileNotFoundError: axes[0,1].axis('off')
-try:
-    image = mpimg.imread('med_' + fig_str); axes[1,1].imshow(image); axes[1,1].axis('off')
-except FileNotFoundError: axes[1,1].axis('off')
-    
-# column 2:
-fig_str = 'lh_str_age'+my_str+'.png'
-try:
-#     axes[0,2].set_title('Ave. ctrb. (left)')
-    image = mpimg.imread('lat_' + fig_str); axes[0,2].imshow(image); axes[0,2].axis('off')
-except FileNotFoundError: axes[0,2].axis('off')
-try:
-    image = mpimg.imread('med_' + fig_str); axes[1,2].imshow(image); axes[1,2].axis('off')
-except FileNotFoundError: axes[1,2].axis('off')
-    
-# column 3:
-fig_str = 'rh_str_age'+my_str+'.png'
-try:
-#     axes[0,3].set_title('Ave. ctrb. (right)')
-    image = mpimg.imread('lat_' + fig_str); axes[0,3].imshow(image); axes[0,3].axis('off')
-except FileNotFoundError: axes[0,3].axis('off')
-try:
-    image = mpimg.imread('med_' + fig_str); axes[1,3].imshow(image); axes[1,3].axis('off')
-except FileNotFoundError: axes[1,3].axis('off')
-
-plt.show()
-f.savefig('brain_age_ct-str'+my_str+'.svg', dpi = 1200, bbox_inches = 'tight', pad_inches = 0)
-
-
-# Figure 2C (bottom)
-
 # In[20]:
 
 
-# Age effects
-f, axes = plt.subplots(2, 4)
-# f.suptitle('age')
-f.set_figwidth(4)
-f.set_figheight(2)
-plt.subplots_adjust(wspace=0, hspace=0)
-
-my_str = '_sex1_frwd'
-# column 0:
-fig_str = 'lh_ac_age'+my_str+'.png'
-try:
-#     axes[0,0].set_title('Thickness (left)')
-    image = mpimg.imread('lat_' + fig_str); axes[0,0].imshow(image); axes[0,0].axis('off')
-except FileNotFoundError: axes[0,0].axis('off')
-try:
-    image = mpimg.imread('med_' + fig_str); axes[1,0].imshow(image); axes[1,0].axis('off')
-except FileNotFoundError: axes[1,0].axis('off')
-    
-# column 1:
-fig_str = 'rh_ac_age'+my_str+'.png'
-try:
-#     axes[0,1].set_title('Thickness (right)')
-    image = mpimg.imread('lat_' + fig_str); axes[0,1].imshow(image); axes[0,1].axis('off')
-except FileNotFoundError: axes[0,1].axis('off')
-try:
-    image = mpimg.imread('med_' + fig_str); axes[1,1].imshow(image); axes[1,1].axis('off')
-except FileNotFoundError: axes[1,1].axis('off')
-    
-# column 2:
-fig_str = 'lh_mc_age'+my_str+'.png'
-try:
-#     axes[0,2].set_title('Ave. ctrb. (left)')
-    image = mpimg.imread('lat_' + fig_str); axes[0,2].imshow(image); axes[0,2].axis('off')
-except FileNotFoundError: axes[0,2].axis('off')
-try:
-    image = mpimg.imread('med_' + fig_str); axes[1,2].imshow(image); axes[1,2].axis('off')
-except FileNotFoundError: axes[1,2].axis('off')
-    
-# column 3:
-fig_str = 'rh_mc_age'+my_str+'.png'
-try:
-#     axes[0,3].set_title('Ave. ctrb. (right)')
-    image = mpimg.imread('lat_' + fig_str); axes[0,3].imshow(image); axes[0,3].axis('off')
-except FileNotFoundError: axes[0,3].axis('off')
-try:
-    image = mpimg.imread('med_' + fig_str); axes[1,3].imshow(image); axes[1,3].axis('off')
-except FileNotFoundError: axes[1,3].axis('off')
-
-plt.show()
-f.savefig('brain_age_ac-mc'+my_str+'.svg', dpi = 1200, bbox_inches = 'tight', pad_inches = 0)
+for my_str in ('_sex0_frwd', '_sex1_frwd'):
+    # Age effects
+    f, axes = plt.subplots(2, 4)
+    f.set_figwidth(4)
+    f.set_figheight(2)
+    plt.subplots_adjust(wspace=0, hspace=0)
 
 
-# eFigure 1A
+    # column 0:
+    fig_str = 'lh_ct_age'+my_str+'.png'
+    try:
+#         axes[0,0].set_title('Thickness (L)', fontsize = 8)
+        image = mpimg.imread('lat_' + fig_str); axes[0,0].imshow(image); axes[0,0].axis('off')
+    except FileNotFoundError: axes[0,0].axis('off')
+    try:
+        image = mpimg.imread('med_' + fig_str); axes[1,0].imshow(image); axes[1,0].axis('off')
+    except FileNotFoundError: axes[1,0].axis('off')
 
-# In[21]:
+    # column 1:
+    fig_str = 'rh_ct_age'+my_str+'.png'
+    try:
+#         axes[0,1].set_title('Thickness (R)', fontsize = 8)
+        image = mpimg.imread('lat_' + fig_str); axes[0,1].imshow(image); axes[0,1].axis('off')
+    except FileNotFoundError: axes[0,1].axis('off')
+    try:
+        image = mpimg.imread('med_' + fig_str); axes[1,1].imshow(image); axes[1,1].axis('off')
+    except FileNotFoundError: axes[1,1].axis('off')
 
+    # column 2:
+    fig_str = 'lh_vol_age'+my_str+'.png'
+    try:
+#         axes[0,2].set_title('Jacobian (L)', fontsize = 8)
+        image = mpimg.imread('lat_' + fig_str); axes[0,2].imshow(image); axes[0,2].axis('off')
+    except FileNotFoundError: axes[0,2].axis('off')
+    try:
+        image = mpimg.imread('med_' + fig_str); axes[1,2].imshow(image); axes[1,2].axis('off')
+    except FileNotFoundError: axes[1,2].axis('off')
 
-# Age effects
-f, axes = plt.subplots(2, 8)
-# f.suptitle('age')
-f.set_figwidth(8)
-f.set_figheight(2)
-plt.subplots_adjust(wspace=0, hspace=0)
+    # column 3:
+    fig_str = 'rh_vol_age'+my_str+'.png'
+    try:
+#         axes[0,3].set_title('Jacobian (R)', fontsize = 8)
+        image = mpimg.imread('lat_' + fig_str); axes[0,3].imshow(image); axes[0,3].axis('off')
+    except FileNotFoundError: axes[0,3].axis('off')
+    try:
+        image = mpimg.imread('med_' + fig_str); axes[1,3].imshow(image); axes[1,3].axis('off')
+    except FileNotFoundError: axes[1,3].axis('off')
 
-my_str = '_sex0_frwd'
-# column 0:
-fig_str = 'lh_ct_age'+my_str+'.png'
-try:
-#     axes[0,0].set_title('Thickness (left)')
-    image = mpimg.imread('lat_' + fig_str); axes[0,0].imshow(image); axes[0,0].axis('off')
-except FileNotFoundError: axes[0,0].axis('off')
-try:
-    image = mpimg.imread('med_' + fig_str); axes[1,0].imshow(image); axes[1,0].axis('off')
-except FileNotFoundError: axes[1,0].axis('off')
-    
-# column 1:
-fig_str = 'rh_ct_age'+my_str+'.png'
-try:
-#     axes[0,1].set_title('Thickness (right)')
-    image = mpimg.imread('lat_' + fig_str); axes[0,1].imshow(image); axes[0,1].axis('off')
-except FileNotFoundError: axes[0,1].axis('off')
-try:
-    image = mpimg.imread('med_' + fig_str); axes[1,1].imshow(image); axes[1,1].axis('off')
-except FileNotFoundError: axes[1,1].axis('off')
-    
-# column 2:
-fig_str = 'lh_str_age'+my_str+'.png'
-try:
-#     axes[0,2].set_title('Degree (left)')
-    image = mpimg.imread('lat_' + fig_str); axes[0,2].imshow(image); axes[0,2].axis('off')
-except FileNotFoundError: axes[0,2].axis('off')
-try:
-    image = mpimg.imread('med_' + fig_str); axes[1,2].imshow(image); axes[1,2].axis('off')
-except FileNotFoundError: axes[1,2].axis('off')
-    
-# column 3:
-fig_str = 'rh_str_age'+my_str+'.png'
-try:
-#     axes[0,3].set_title('Degree (right)')
-    image = mpimg.imread('lat_' + fig_str); axes[0,3].imshow(image); axes[0,3].axis('off')
-except FileNotFoundError: axes[0,3].axis('off')
-try:
-    image = mpimg.imread('med_' + fig_str); axes[1,3].imshow(image); axes[1,3].axis('off')
-except FileNotFoundError: axes[1,3].axis('off')
-    
-# column 4:
-fig_str = 'lh_ac_age'+my_str+'.png'
-try:
-#     axes[0,4].set_title('Ave. ctrb. (left)')
-    image = mpimg.imread('lat_' + fig_str); axes[0,4].imshow(image); axes[0,4].axis('off')
-except FileNotFoundError: axes[0,4].axis('off')
-try:
-    image = mpimg.imread('med_' + fig_str); axes[1,4].imshow(image); axes[1,4].axis('off')
-except FileNotFoundError: axes[1,4].axis('off')
-    
-# column 5:
-fig_str = 'rh_ac_age'+my_str+'.png'
-try:
-#     axes[0,5].set_title('Ave. ctrb. (right)')
-    image = mpimg.imread('lat_' + fig_str); axes[0,5].imshow(image); axes[0,5].axis('off')
-except FileNotFoundError: axes[0,5].axis('off')
-try:
-    image = mpimg.imread('med_' + fig_str); axes[1,5].imshow(image); axes[1,5].axis('off')
-except FileNotFoundError: axes[1,5].axis('off')
-    
-# column 6:
-fig_str = 'lh_mc_age'+my_str+'.png'
-try:
-#     axes[0,6].set_title('Mod. ctrb. (left)')
-    image = mpimg.imread('lat_' + fig_str); axes[0,6].imshow(image); axes[0,6].axis('off')
-except FileNotFoundError: axes[0,6].axis('off')
-try:
-    image = mpimg.imread('med_' + fig_str); axes[1,6].imshow(image); axes[1,6].axis('off')
-except FileNotFoundError: axes[1,6].axis('off')
-    
-# column 7:
-fig_str = 'rh_mc_age'+my_str+'.png'
-try:
-#     axes[0,7].set_title('Mod. ctrb. (right)')
-    image = mpimg.imread('lat_' + fig_str); axes[0,7].imshow(image); axes[0,7].axis('off')
-except FileNotFoundError: axes[0,7].axis('off')
-try:
-    image = mpimg.imread('med_' + fig_str); axes[1,7].imshow(image); axes[1,7].axis('off')
-except FileNotFoundError: axes[1,7].axis('off')
-
-plt.show()
-f.savefig('brain_age'+my_str+'.svg', dpi = 1200, bbox_inches = 'tight', pad_inches = 0)
+    plt.show()
+    f.savefig('brain_age'+my_str+'.svg', dpi = 1200, bbox_inches = 'tight', pad_inches = 0)
+    f.savefig('brain_age'+my_str+'.png', dpi = 300, bbox_inches = 'tight', pad_inches = 0)
 
