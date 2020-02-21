@@ -81,7 +81,8 @@ for (i, (index, row)) in enumerate(df.iterrows()):
     file_name = os.environ['CT_NAME_TMP'].replace("bblid", str(index[0]))
     file_name = file_name.replace("scanid", str(index[1]))
     full_path = glob.glob(os.path.join(os.environ['CTDIR'], file_name))
-    
+    if i == 0: print(full_path)    
+
     ct = np.loadtxt(full_path[0])
     CT[i,:] = ct
     
@@ -106,6 +107,7 @@ for (i, (index, row)) in enumerate(df.iterrows()):
     file_name = os.environ['VOL_NAME_TMP'].replace("bblid", str(index[0]))
     file_name = file_name.replace("scanid", str(index[1]))
     full_path = glob.glob(os.path.join(os.environ['VOLDIR'], file_name))
+    if i == 0: print(full_path)    
     
     img = nib.load(full_path[0])
     v = np.array(img.dataobj)
