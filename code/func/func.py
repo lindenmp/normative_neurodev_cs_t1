@@ -228,17 +228,17 @@ def run_corr(df_X, df_y, typ = 'spearmanr'):
     return df_corr
 
 
-def get_fdr_p(p_vals):
-    out = multitest.multipletests(p_vals, alpha = 0.05, method = 'fdr_bh')
+def get_fdr_p(p_vals, alpha = 0.05):
+    out = multitest.multipletests(p_vals, alpha = alpha, method = 'fdr_bh')
     p_fdr = out[1] 
 
     return p_fdr
 
 
-def get_fdr_p_df(p_vals):
+def get_fdr_p_df(p_vals, alpha = 0.05):
     p_fdr = pd.DataFrame(index = p_vals.index,
                         columns = p_vals.columns,
-                        data = np.reshape(get_fdr_p(p_vals.values.flatten()), p_vals.shape))
+                        data = np.reshape(get_fdr_p(p_vals.values.flatten(), alpha = alpha), p_vals.shape))
 
     return p_fdr
 
