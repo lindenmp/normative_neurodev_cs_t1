@@ -64,7 +64,7 @@ def set_proj_env(dataset = 'PNC', train_test_str = 'squeakycleanExclude', exclud
         yeo_labels = ('Visual', 'Somatomator', 'Dorsal Attention', 'Ventral Attention', 'Limbic', 'Frontoparietal Control', 'Default Mode', 'Subcortical', 'Brainstem')
     elif parc_str == 'schaefer':
         yeo_idx = np.loadtxt(os.path.join(projdir, 'figs_support/labels/yeo17netlabelsSchaefer' + str(parc_scale) + '.txt')).astype(int)
-        yeo_labels = ('VisCent', 'VisPeri', 'SomMotA', 'SomMotB', 'DorsAttnA', 'DorsAttnB', 'SalVentAttnA', 'SalVentAttnB',
-                    'LimbicA', 'LimbicB', 'ContA', 'ContB', 'ContC', 'DefaultA', 'DefaultB', 'DefaultC', 'TempPar')
+        yeo_labels = ('Vis. A', 'Vis. B', 'Som. Mot. A', 'Som. Mot. B', 'Dors. Attn. A', 'Dors. Attn. B', 'Sal. Vent. Attn. A', 'Sal. Vent. Attn. B',
+                    'Limbic A', 'Limbic B', 'Cont. A', 'Cont. B', 'Cont. C', 'Default A', 'Default B', 'Default C', 'Temp. Par.')
 
     return parcel_names, parcel_loc, drop_parcels, num_parcels, yeo_idx, yeo_labels
