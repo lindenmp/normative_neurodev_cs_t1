@@ -6,11 +6,22 @@
 # In[1]:
 
 
+# Essentials
 import os, sys, glob
 import pandas as pd
 import numpy as np
-import scipy.io as sio
 import nibabel as nib
+
+# Stats
+import scipy as sp
+from scipy import stats
+import statsmodels.api as sm
+import pingouin as pg
+
+# Plotting
+import seaborn as sns
+import matplotlib.pyplot as plt
+plt.rcParams['svg.fonttype'] = 'none'
 
 
 # In[2]:
