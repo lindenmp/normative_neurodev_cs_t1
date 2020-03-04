@@ -6,12 +6,22 @@
 # In[1]:
 
 
-import os, sys
-import numpy as np
+# Essentials
+import os, sys, glob
 import pandas as pd
+import numpy as np
+import nibabel as nib
+
+# Stats
+import scipy as sp
+from scipy import stats
+import statsmodels.api as sm
+import pingouin as pg
+
+# Plotting
 import seaborn as sns
 import matplotlib.pyplot as plt
-import statsmodels.api as sm
+plt.rcParams['svg.fonttype'] = 'none'
 
 
 # In[2]:
@@ -63,6 +73,9 @@ brain_vol = pd.read_csv(os.path.join(os.environ['DERIVSDIR'], 'pncDataFreeze2017
 
 # GOASSESS Bifactor scores
 goassess = pd.read_csv('/Users/lindenmp/Dropbox/Work/ResData/PNC/GO1_clinical_factor_scores_psychosis_split_BIFACTOR.csv')
+# Psych summary
+psych = pd.read_csv(os.path.join(os.environ['DERIVSDIR'], 'pncDataFreeze20170905/n1601_dataFreeze/clinical/n1601_goassess_psych_summary_vars_20131014.csv'))
+
 
 # merge
 df = health
@@ -72,6 +85,7 @@ df = pd.merge(df, dti_qa, on=['scanid', 'bblid']) # dti_qa
 df = pd.merge(df, rest_qa, on=['scanid', 'bblid']) # rest_qa
 df = pd.merge(df, demog, on=['scanid', 'bblid']) # demog
 df = pd.merge(df, goassess, on=['bblid']) # goassess
+df = pd.merge(df, psych, on=['scanid', 'bblid']) # goassess
 df = pd.merge(df, brain_vol, on=['scanid', 'bblid']) # brain_vol
 
 print(df.shape[0])
@@ -166,7 +180,13 @@ elif test_diff.size != 0:
 
 header = [train_test_str, 'ageAtScan1', 'ageAtScan1_Years','sex','race2','handednessv2',
           'dti64MeanAbsRMS','dti64MeanRelRMS','dti64MaxAbsRMS','dti64MaxRelRMS','mprage_antsCT_vol_TBV', 'averageManualRating',
-          'Overall_Psychopathology','Psychosis_Positive','Psychosis_NegativeDisorg','AnxiousMisery','Externalizing','Fear']
+          'Overall_Psychopathology','Psychosis_Positive','Psychosis_NegativeDisorg','AnxiousMisery','Externalizing','Fear',
+          'goassessSmryMood', 'goassessSmryMan', 'goassessSmryDep', 'goassessSmryEat', 'goassessSmryBul',
+          'goassessSmryAno', 'goassessSmryAnx', 'goassessSmryGad', 'goassessSmrySep', 'goassessSmryPhb', 'goassessSmrySoc',
+          'goassessSmryPan', 'goassessSmryAgr', 'goassessSmryOcd', 'goassessSmryPtd', 'goassessSmryPsy', 'goassessSmryDel',
+          'goassessSmryHal', 'goassessSmryHalAv', 'goassessSmryHalAs', 'goassessSmryHalVh', 'goassessSmryHalOh', 'goassessSmryHalTh',
+          'goassessSmryBeh', 'goassessSmryAdd', 'goassessSmryOdd', 'goassessSmryCon', 'goassessSmryPrimePos1', 'goassessSmryPrimeTot',
+          'goassessSmryPrimePos2', 'goassessSmryPsychOverallRtg']
 df.to_csv(os.path.join(os.environ['TRTEDIR'], 'df_pheno.csv'), columns = header)
 
 
@@ -181,9 +201,9 @@ sns.set(style='white', context = 'paper', font_scale = 1)
 cmap = get_cmap('pair')
 
 labels = ['Train', 'Test']
-phenos = ('Overall_Psychopathology','Psychosis_Positive','Psychosis_NegativeDisorg','AnxiousMisery','Externalizing','Fear')
-phenos_label_short = ('Ov. Psych.', 'Psy. (pos.)', 'Psy. (neg.)', 'Anx.-mis.', 'Ext.', 'Fear')
-phenos_label = ('Overall Psychopathology','Psychosis (Positive)','Psychosis (Negative)','Anxious-Misery','Externalizing','Fear')
+phenos = ['Overall_Psychopathology','Psychosis_Positive','Psychosis_NegativeDisorg','AnxiousMisery','Externalizing','Fear']
+phenos_label_short = ['Ov. Psych.', 'Psy. (pos.)', 'Psy. (neg.)', 'Anx.-mis.', 'Ext.', 'Fear']
+phenos_label = ['Overall Psychopathology','Psychosis (Positive)','Psychosis (Negative)','Anxious-Misery','Externalizing','Fear']
 print(phenos)
 
 
