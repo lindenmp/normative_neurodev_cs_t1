@@ -1,6 +1,21 @@
 # Normative neurodevelopment
 This repository includes code used to analyze the relationship between dimensional psychopathology phenotypes and deviations from normative neurodevelopment in the Philadelphia Neurodevelopmental Cohort.
 
+# Environment build
+
+    conda create -n NormativeNeuroDev_CrossSec_T1 python=3.7
+    conda activate NormativeNeuroDev_CrossSec_T1
+    # Essentials
+    pip install jupyterlab ipython pandas numpy scipy seaborn matplotlib
+    pip install jupyter_contrib_nbextensions && jupyter contrib nbextension install
+	# Statistics
+	pip install statsmodels sklearn pingouin
+	# Extras
+    pip install nibabel torch glob3
+    cd /Users/lindenmp/Dropbox/Work/ResProjects/NormativeNeuroDev_CrossSec_T1
+    conda env export > environment.yml
+	pip freeze > requirements.txt
+
 # Code
 
 In the **code** subdirectory you will find the following Jupyter notebooks and .py scripts:
