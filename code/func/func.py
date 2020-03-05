@@ -5,6 +5,7 @@
 
 from IPython.display import clear_output
 
+import os
 import numpy as np
 import scipy as sp
 from scipy.stats import t
@@ -217,13 +218,40 @@ def get_synth_cov(df, cov = 'ageAtScan1_Years', stp = 1):
     return X
 
 
-def run_corr(df_X, df_y, typ = 'spearmanr'):
-    df_corr = pd.DataFrame(index = df_y.columns, columns = ['coef', 'p'])
-    for i, row in df_corr.iterrows():
-        if typ == 'spearmanr':
-            df_corr.loc[i] = sp.stats.spearmanr(df_X, df_y[i])
-        elif typ == 'pearsonr':
-            df_corr.loc[i] = sp.stats.pearsonr(df_X, df_y[i])
+def summarise_network(df_z, network_idx, roi_loc, metrics = ('ct',), method = 'mean'):
+    """ Get system averages of input dataframe """
+
+    df_out = pd.DataFrame()
+    for metric in metrics:
+        if metric == 'ct':
+            if method == 'median': df_tmp = df_z.filter(regex = metric).groupby(network_idx[roi_loc == 1], axis = 1).median()
+            if method == 'mean': df_tmp = df_z.filter(regex = metric).groupby(network_idx[roi_loc == 1], axis = 1).mean()
+            if method == 'max': df_tmp = df_z.filter(regex = metric).groupby(network_idx[roi_loc == 1], axis = 1).max()
+            
+            my_list = [metric + '_' + str(i) for i in np.unique(network_idx[roi_loc == 1]).astype(int)]
+            df_tmp.columns = my_list
+        else:
+            if method == 'median': df_tmp = df_z.filter(regex = metric).groupby(network_idx, axis = 1).median()
+            if method == 'mean': df_tmp = df_z.filter(regex = metric).groupby(network_idx, axis = 1).mean()
+            if method == 'max': df_tmp = df_z.filter(regex = metric).groupby(network_idx, axis = 1).max()
+            
+            my_list = [metric + '_' + str(i) for i in np.unique(network_idx).astype(int)]
+            df_tmp.columns = my_list
+
+        df_out = pd.concat((df_out, df_tmp), axis = 1)
+
+    return df_out
+
+
+def run_corr(my_series, my_dataframe, method = 'pearsonr'):
+    """ Simple correlation between pandas series and columns in a dataframe """
+    df_corr = pd.DataFrame(index = my_dataframe.columns, columns = ['coef', 'p'])
+    if method == 'spearmanr':
+        for i, row in df_corr.iterrows():
+            df_corr.loc[i] = sp.stats.spearmanr(my_series, my_dataframe[i])
+    elif method == 'pearsonr':
+        for i, row in df_corr.iterrows():
+            df_corr.loc[i] = sp.stats.pearsonr(my_series, my_dataframe[i])
 
     return df_corr
 
@@ -243,18 +271,133 @@ def get_fdr_p_df(p_vals, alpha = 0.05):
     return p_fdr
 
 
+def compute_null(df, df_z, num_perms = 1000, method = 'pearson'):
+    np.random.seed(0)
+    null = np.zeros((num_perms,df_z.shape[1]))
+
+    for i in range(num_perms):
+        if i%10 == 0: update_progress(i/num_perms, df.name)
+        null[i,:] = df_z.reset_index(drop = True).corrwith(df.sample(frac = 1).reset_index(drop = True), method = method)
+    update_progress(1, df.name)   
+    
+    return null
+
+
 def get_null_p(coef, null):
 
-    num_perms = null.shape[1]
-    num_parcels = len(coef)
-    p_perm = np.zeros((num_parcels,))
+    num_perms = null.shape[0]
+    num_vars = len(coef)
+    p_perm = np.zeros((num_vars,))
 
-    for i in range(num_parcels):
+    for i in range(num_vars):
         r_obs = abs(coef[i])
-        r_perm = abs(null[i,:])
+        r_perm = abs(null[:,i])
         p_perm[i] = np.sum(r_perm >= r_obs) / num_perms
 
     return p_perm
+
+
+def run_pheno_correlations(df_phenos, df_z, method = 'pearson', assign_p = 'permutation', nulldir = os.getcwd()):
+    df_out = pd.DataFrame(columns = ['pheno','variable','coef', 'p'])
+    phenos = df_phenos.columns
+    
+    for pheno in phenos:
+        df_tmp = pd.DataFrame(index = df_z.columns, columns = ['coef', 'p'])
+        if assign_p == 'permutation':
+            # Get true correlation
+            df_tmp.loc[:,'coef'] = df_z.corrwith(df_phenos.loc[:,pheno], method = method)
+            # Get null
+            if os.path.exists(os.path.join(nulldir,'null_' + pheno + '_' + method + '.npy')): # if null exists, load it
+                null = np.load(os.path.join(nulldir,'null_' + pheno + '_' + method + '.npy')) 
+            else: # otherwise, compute and save it out
+                null = compute_null(df_phenos.loc[:,pheno], df_z, num_perms = 1000, method = method)
+                np.save(os.path.join(nulldir,'null_' + pheno + '_' + method), null)
+            # Compute p-values using null
+            df_tmp.loc[:,'p'] = get_null_p(df_tmp.loc[:,'coef'].values, null)
+        elif assign_p == 'parametric':
+            if method == 'pearson':
+                for col in df_z.columns:
+                    df_tmp.loc[col,'coef'] = sp.stats.pearsonr(df_phenos.loc[:,pheno], df_z.loc[:,col])[0]
+                    df_tmp.loc[col,'p'] = sp.stats.pearsonr(df_phenos.loc[:,pheno], df_z.loc[:,col])[1]
+            if method == 'spearman':
+                for col in df_z.columns:
+                    df_tmp.loc[col,'coef'] = sp.stats.spearmanr(df_phenos.loc[:,pheno], df_z.loc[:,col])[0]
+                    df_tmp.loc[col,'p'] = sp.stats.spearmanr(df_phenos.loc[:,pheno], df_z.loc[:,col])[1]    
+        # append
+        df_tmp.reset_index(inplace = True); df_tmp.rename(index=str, columns={'index': 'variable'}, inplace = True); df_tmp['pheno'] = pheno
+        df_out = df_out.append(df_tmp, sort = False)
+    df_out.set_index(['pheno','variable'], inplace = True)
+    
+    return df_out
+
+
+# Create grouping variable
+def create_dummy_vars(df, groups):
+    dummy_vars = np.zeros((df.shape[0],1)).astype(bool)
+    for i, group in enumerate(groups):
+        x = df.loc[:,group].values == 4
+        print(group+':', x.sum())
+        x = x.reshape(-1,1)
+        x = x.astype(bool)
+        dummy_vars = np.append(dummy_vars, x, axis = 1)
+    dummy_vars = dummy_vars[:,1:]
+    
+    # filter comorbid
+    comorbid_diag = np.sum(dummy_vars, axis = 1) > 1
+    print('Comorbid N:', comorbid_diag.sum())
+    dummy_vars[comorbid_diag,:] = 0
+
+    for i, group in enumerate(groups):
+        print(group+':', dummy_vars[:,i].sum())
+    
+    return dummy_vars
+
+
+def run_ttest(df_x, df_y = '', tail = 'two'):
+    df_out = pd.DataFrame(index = np.arange(0,df_x.shape[1]))
+    if type(df_y) == str:
+        df_out.loc[:,'mean'] = df_x.mean(axis = 0).values
+        test = sp.stats.ttest_1samp(df_x, popmean = 0)
+    else:
+        df_out.loc[:,'mean_diff'] = df_x.mean(axis = 0).values - df_y.mean(axis = 0).values
+        test = sp.stats.ttest_ind(df_x, df_y)
+        
+    df_out.loc[:,'tstat'] = test[0]
+    df_out.loc[:,'p'] = test[1]
+    
+    if tail == 'one': df_out.loc[:,'p'] = df_out.loc[:,'p']/2
+        
+    df_out.loc[:,'p-corr'] = get_fdr_p(df_out.loc[:,'p'])
+    
+    return df_out
+
+
+def run_perm_test(df_x, df_y, num_perms = 1000):
+    np.random.seed(0)
+    num_vars = df_x.shape[1]
+    df_out = pd.DataFrame(index = np.arange(0,num_vars))
+        
+    # concatenate inputs and create labels
+    df_in = pd.concat((df_x,df_y), axis = 0)
+    labels = np.concatenate((np.ones(df_x.shape[0]), np.zeros(df_y.shape[0])))
+    
+    # get true mean difference (df_x - df_y)
+    df_out.loc[:,'mean_diff'] = df_in.iloc[labels == 1,:].mean(axis = 0).values - df_in.iloc[labels == 0,:].mean(axis = 0).values
+    
+    # generate null
+    null = np.zeros((num_perms,num_vars))
+    for i in range(num_perms):
+        np.random.shuffle(labels)
+        null[i,:] = df_in.iloc[labels == 1,:].mean(axis = 0).values - df_in.iloc[labels == 0,:].mean(axis = 0).values
+    
+    # calculate two-sided p-value
+    for i in range(num_vars):
+        df_out.loc[i,'p'] = np.sum(null[:,i] >= df_out.loc[i,'mean_diff']) / num_perms
+    
+    # correct for multiple comparisons using FDR
+    df_out.loc[:,'p-corr'] = get_fdr_p(df_out.loc[:,'p'])
+        
+    return df_out
 
 
 def get_sys_summary(coef, p_vals, idx, method = 'mean', alpha = 0.05, signed = True):
@@ -382,30 +525,6 @@ def perc_dev(Z, thr = 2.6, sign = 'abs'):
     Z_perc = np.sum(bol, axis = 1) / Z.shape[1] * 100
     
     return Z_perc
-
-
-def summarise_network(df_z, roi_loc, network_idx, metrics = ('ct', 'deg', 'ac', 'mc'), method = 'median'):
-
-    df_out = pd.DataFrame()
-    for metric in metrics:
-        if metric == 'ct':
-            if method == 'median': df_tmp = df_z.filter(regex = metric).groupby(network_idx[roi_loc == 1], axis = 1).median()
-            if method == 'mean': df_tmp = df_z.filter(regex = metric).groupby(network_idx[roi_loc == 1], axis = 1).mean()
-            if method == 'max': df_tmp = df_z.filter(regex = metric).groupby(network_idx[roi_loc == 1], axis = 1).max()
-            
-            my_list = [metric + '_' + str(i) for i in np.unique(network_idx[roi_loc == 1]).astype(int)]
-            df_tmp.columns = my_list
-        else:
-            if method == 'median': df_tmp = df_z.filter(regex = metric).groupby(network_idx, axis = 1).median()
-            if method == 'mean': df_tmp = df_z.filter(regex = metric).groupby(network_idx, axis = 1).mean()
-            if method == 'max': df_tmp = df_z.filter(regex = metric).groupby(network_idx, axis = 1).max()
-            
-            my_list = [metric + '_' + str(i) for i in np.unique(network_idx).astype(int)]
-            df_tmp.columns = my_list
-
-        df_out = pd.concat((df_out, df_tmp), axis = 1)
-
-    return df_out
 
 
 def dependent_corr(xy, xz, yz, n, twotailed=True):
