@@ -3,17 +3,24 @@ This repository includes code used to analyze the relationship between dimension
 
 # Environment build
 
-    conda create -n NormativeNeuroDev_CrossSec_T1 python=3.7
-    conda activate NormativeNeuroDev_CrossSec_T1
-    # Essentials
-    pip install jupyterlab ipython pandas numpy scipy seaborn matplotlib
-    pip install jupyter_contrib_nbextensions && jupyter contrib nbextension install
+	conda create -n NormativeNeuroDev_CrossSec_T1 python=3.7
+	conda activate NormativeNeuroDev_CrossSec_T1
+	# Essentials
+	pip install jupyterlab ipython pandas numpy scipy seaborn matplotlib
+	pip install jupyter_contrib_nbextensions && jupyter contrib nbextension install
 	# Statistics
 	pip install statsmodels sklearn pingouin
 	# Extras
-    pip install nibabel torch glob3
-    cd /Users/lindenmp/Dropbox/Work/ResProjects/NormativeNeuroDev_CrossSec_T1
-    conda env export > environment.yml
+	pip install nibabel torch glob3
+	# Pysurfer for plotting
+	pip install mayavi
+	pip install PyQt5
+	jupyter nbextension install --py mayavi --user
+	jupyter nbextension enable --py mayavi --user
+	pip install pysurfer
+
+	cd /Users/lindenmp/Dropbox/Work/ResProjects/NormativeNeuroDev_CrossSec_T1
+	conda env export > environment.yml
 	pip freeze > requirements.txt
 
 # Code
