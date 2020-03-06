@@ -3,21 +3,29 @@
 # Linden Parkes, 2019
 # lindenmp@seas.upenn.edu
 
-from IPython.display import clear_output
-
-import os
-import numpy as np
-import scipy as sp
-from scipy.stats import t
+# Essentials
+import os, sys, glob
 import pandas as pd
+import numpy as np
+import nibabel as nib
 
+# Stats
+import scipy as sp
+from scipy import stats
+import statsmodels.api as sm
+import pingouin as pg
+
+# Plotting
+import seaborn as sns
+import matplotlib.pyplot as plt
+plt.rcParams['svg.fonttype'] = 'none'
+
+from IPython.display import clear_output
+from scipy.stats import t
 from numpy.matlib import repmat 
 from scipy.linalg import svd, schur
-from scipy import stats
-
 from statsmodels.stats import multitest
 
-import matplotlib.pyplot as plt
 
 def get_cmap(which_type = 'qual1', num_classes = 8):
     # Returns a nice set of colors to make a nice colormap using the color schemes
@@ -331,6 +339,31 @@ def run_pheno_correlations(df_phenos, df_z, method = 'pearson', assign_p = 'perm
     return df_out
 
 
+def run_pheno_partialcorrs(df_phenos, df_z, method = 'pearson'):
+    df_input = pd.concat((df_phenos, df_z), axis = 1)
+    if method == 'pearson': df_out = pd.DataFrame(columns = ['pheno','variable','coef', 'p', 'BF10'])
+    else: df_out = pd.DataFrame(columns = ['pheno','variable','coef', 'p'])
+    phenos = list(df_phenos.columns)
+    
+    for pheno in phenos:
+        print(pheno)
+        if method == 'pearson': df_tmp = pd.DataFrame(index = df_z.columns, columns = ['coef', 'p', 'BF10'])
+        else: df_tmp = pd.DataFrame(index = df_z.columns, columns = ['coef', 'p'])
+        
+        phenos_cov = phenos.copy(); phenos_cov.remove(pheno)
+        results = pg.pairwise_corr(data = df_input, columns = [[pheno], list(df_z.columns)], covar = phenos_cov, method = method)
+        results.set_index('Y', inplace = True)
+        df_tmp.loc[:,'coef'] = results['r']; df_tmp.loc[:,'p'] = results['p-unc']
+        if method == 'pearson': df_tmp.loc[:,'BF10'] = results['BF10'].astype(float)
+        
+        # append
+        df_tmp.reset_index(inplace = True); df_tmp.rename(index=str, columns={'index': 'variable'}, inplace = True); df_tmp['pheno'] = pheno
+        df_out = df_out.append(df_tmp, sort = False)
+    df_out.set_index(['pheno','variable'], inplace = True)
+    
+    return df_out
+
+
 # Create grouping variable
 def create_dummy_vars(df, groups):
     dummy_vars = np.zeros((df.shape[0],1)).astype(bool)
@@ -398,6 +431,25 @@ def run_perm_test(df_x, df_y, num_perms = 1000):
     df_out.loc[:,'p-corr'] = get_fdr_p(df_out.loc[:,'p'])
         
     return df_out
+
+
+def get_sys_prop(coef, p_vals, idx, alpha = 0.05):
+    u_idx = np.unique(idx)
+    sys_prop = np.zeros((len(u_idx),2))
+
+    for i in u_idx:
+        # filter regions by system idx
+        coef_tmp = coef[idx == i]
+        p_tmp = p_vals[idx == i]
+        
+        # threshold out non-sig coef
+        coef_tmp = coef_tmp[p_tmp < alpha]
+
+        # proportion of signed significant coefs within system i
+        sys_prop[i-1,0] = coef_tmp[coef_tmp > 0].shape[0] / np.sum(idx == i)
+        sys_prop[i-1,1] = coef_tmp[coef_tmp < 0].shape[0] / np.sum(idx == i)
+
+    return sys_prop
 
 
 def get_sys_summary(coef, p_vals, idx, method = 'mean', alpha = 0.05, signed = True):
