@@ -387,12 +387,12 @@ def create_dummy_vars(df, groups):
 
 
 def run_ttest(df_x, df_y = '', tail = 'two'):
-    df_out = pd.DataFrame(index = np.arange(0,df_x.shape[1]))
+    df_out = pd.DataFrame(index = df_x.columns)
     if type(df_y) == str:
-        df_out.loc[:,'mean'] = df_x.mean(axis = 0).values
+        df_out.loc[:,'mean'] = df_x.mean(axis = 0)
         test = sp.stats.ttest_1samp(df_x, popmean = 0)
     else:
-        df_out.loc[:,'mean_diff'] = df_x.mean(axis = 0).values - df_y.mean(axis = 0).values
+        df_out.loc[:,'mean_diff'] = df_x.mean(axis = 0) - df_y.mean(axis = 0)
         test = sp.stats.ttest_ind(df_x, df_y)
         
     df_out.loc[:,'tstat'] = test[0]
@@ -405,17 +405,25 @@ def run_ttest(df_x, df_y = '', tail = 'two'):
     return df_out
 
 
+def get_cohend(df_x, df_y):
+    df_out = pd.DataFrame(index = df_x.columns)
+    df_out.loc[:,'mean_diff'] = df_x.mean(axis = 0) - df_y.mean(axis = 0)
+    df_out.loc[:,'d'] = df_out.loc[:,'mean_diff'] / pd.concat((df_x,df_y), axis = 0).std()
+    
+    return df_out
+
+
 def run_perm_test(df_x, df_y, num_perms = 1000):
     np.random.seed(0)
     num_vars = df_x.shape[1]
-    df_out = pd.DataFrame(index = np.arange(0,num_vars))
+    df_out = pd.DataFrame(index = df_x.columns)
         
     # concatenate inputs and create labels
     df_in = pd.concat((df_x,df_y), axis = 0)
     labels = np.concatenate((np.ones(df_x.shape[0]), np.zeros(df_y.shape[0])))
     
     # get true mean difference (df_x - df_y)
-    df_out.loc[:,'mean_diff'] = df_in.iloc[labels == 1,:].mean(axis = 0).values - df_in.iloc[labels == 0,:].mean(axis = 0).values
+    df_out.loc[:,'mean_diff'] = df_in.iloc[labels == 1,:].mean(axis = 0) - df_in.iloc[labels == 0,:].mean(axis = 0)
     
     # generate null
     null = np.zeros((num_perms,num_vars))
@@ -424,8 +432,8 @@ def run_perm_test(df_x, df_y, num_perms = 1000):
         null[i,:] = df_in.iloc[labels == 1,:].mean(axis = 0).values - df_in.iloc[labels == 0,:].mean(axis = 0).values
     
     # calculate two-sided p-value
-    for i in range(num_vars):
-        df_out.loc[i,'p'] = np.sum(null[:,i] >= df_out.loc[i,'mean_diff']) / num_perms
+    for i, row in enumerate(df_out.index):
+        df_out.loc[row,'p'] = np.sum(null[:,i] >= df_out.loc[row,'mean_diff']) / num_perms
     
     # correct for multiple comparisons using FDR
     df_out.loc[:,'p-corr'] = get_fdr_p(df_out.loc[:,'p'])
