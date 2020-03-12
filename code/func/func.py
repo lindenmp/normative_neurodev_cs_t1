@@ -551,8 +551,10 @@ def prop_bar_plot(sys_prop, sys_summary, labels = '', which_colors = 'yeo17', ax
     else:
         if axlim == 0.2:
             ax.set_xticks(np.arange(-axlim, axlim+0.1, 0.1))
-        if axlim == 0.1:
+        elif axlim == 0.1:
             ax.set_xticks(np.arange(-axlim, axlim+0.05, 0.05))
+        elif axlim == 1:
+            ax.set_xticks(np.arange(-axlim, axlim+0.5, 0.5))
         else:
             ax.set_xlim([-axlim, axlim])
 
