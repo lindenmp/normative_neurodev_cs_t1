@@ -36,9 +36,9 @@ from func import get_cmap
 
 
 train_test_str = 'squeakycleanExclude'
-exclude_str = 't1Exclude' # 't1Exclude' 'fsFinalExclude'
-parc_str = 'schaefer' # 'schaefer' 'lausanne'
-parc_scale = 400 # 200 400 | 60 125
+exclude_str = 'fsFinalExclude' # 't1Exclude' 'fsFinalExclude'
+parc_str = 'lausanne' # 'schaefer' 'lausanne'
+parc_scale = 250 # 200 400 | 60 125 250
 _ = set_proj_env(train_test_str = train_test_str, exclude_str = exclude_str, parc_str = parc_str, parc_scale = parc_scale)
 
 
@@ -75,6 +75,8 @@ brain_vol = pd.read_csv(os.path.join(os.environ['DERIVSDIR'], 'pncDataFreeze2017
 goassess = pd.read_csv('/Users/lindenmp/Dropbox/Work/ResData/PNC/GO1_clinical_factor_scores_psychosis_split_BIFACTOR.csv')
 # Psych summary
 psych = pd.read_csv(os.path.join(os.environ['DERIVSDIR'], 'pncDataFreeze20170905/n1601_dataFreeze/clinical/n1601_goassess_psych_summary_vars_20131014.csv'))
+# Psychosis summary
+psychosis = pd.read_csv('/Users/lindenmp/Dropbox/Work/ResData/PNC/n1601_diagnosis_dxpmr_20170509.csv')
 
 
 # merge
@@ -86,6 +88,7 @@ df = pd.merge(df, rest_qa, on=['scanid', 'bblid']) # rest_qa
 df = pd.merge(df, demog, on=['scanid', 'bblid']) # demog
 df = pd.merge(df, goassess, on=['bblid']) # goassess
 df = pd.merge(df, psych, on=['scanid', 'bblid']) # goassess
+df = pd.merge(df, psychosis, on=['scanid', 'bblid']) # goassess
 df = pd.merge(df, brain_vol, on=['scanid', 'bblid']) # brain_vol
 
 print(df.shape[0])
@@ -186,7 +189,7 @@ header = [train_test_str, 'ageAtScan1', 'ageAtScan1_Years','sex','race2','handed
           'goassessSmryPan', 'goassessSmryAgr', 'goassessSmryOcd', 'goassessSmryPtd', 'goassessSmryPsy', 'goassessSmryDel',
           'goassessSmryHal', 'goassessSmryHalAv', 'goassessSmryHalAs', 'goassessSmryHalVh', 'goassessSmryHalOh', 'goassessSmryHalTh',
           'goassessSmryBeh', 'goassessSmryAdd', 'goassessSmryOdd', 'goassessSmryCon', 'goassessSmryPrimePos1', 'goassessSmryPrimeTot',
-          'goassessSmryPrimePos2', 'goassessSmryPsychOverallRtg']
+          'goassessSmryPrimePos2', 'goassessSmryPsychOverallRtg', 'goassessDxpmr7']
 df.to_csv(os.path.join(os.environ['TRTEDIR'], 'df_pheno.csv'), columns = header)
 
 
@@ -275,4 +278,10 @@ ax.set_yticklabels(phenos_label_short)
 ax.set_ylabel('Psychopathology phenotypes')
 ax.set_xlabel('Phenotype score')
 f.savefig('phenos_distributions.svg', dpi = 300, bbox_inches = 'tight', pad_inches = 0)
+
+
+# In[ ]:
+
+
+
 
