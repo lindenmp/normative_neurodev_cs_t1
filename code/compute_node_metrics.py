@@ -31,13 +31,13 @@ sys.path.append('/Users/lindenmp/Dropbox/Work/ResProjects/NormativeNeuroDev_Cros
 from proj_environment import set_proj_env
 
 
-# In[3]:
+# In[ ]:
 
 
 train_test_str = 'squeakycleanExclude'
-exclude_str = 't1Exclude' # 't1Exclude' 'fsFinalExclude'
-parc_str = 'schaefer' # 'schaefer' 'lausanne'
-parc_scale = 400 # 200 400 | 60 125
+exclude_str = 'fsFinalExclude' # 't1Exclude' 'fsFinalExclude'
+parc_str = 'lausanne' # 'schaefer' 'lausanne'
+parc_scale = 250 # 200 400 | 60 125 250
 parcel_names, parcel_loc, drop_parcels, num_parcels, yeo_idx, yeo_labels = set_proj_env(train_test_str = train_test_str, exclude_str = exclude_str,
                                                                             parc_str = parc_str, parc_scale = parc_scale)
 
@@ -86,30 +86,54 @@ print(df_node.shape)
 # In[8]:
 
 
+# subject filter
+subj_filt = np.zeros((df.shape[0],)).astype(bool)
+
+
+# In[9]:
+
+
 CT = np.zeros((df.shape[0], num_parcels))
 
 for (i, (index, row)) in enumerate(df.iterrows()):
     file_name = os.environ['CT_NAME_TMP'].replace("bblid", str(index[0]))
     file_name = file_name.replace("scanid", str(index[1]))
     full_path = glob.glob(os.path.join(os.environ['CTDIR'], file_name))
-    if i == 0: print(full_path)    
-
-    ct = np.loadtxt(full_path[0])
-    CT[i,:] = ct
+    if i == 0: print(full_path)
+        
+    if len(full_path) > 0:
+        ct = np.loadtxt(full_path[0])
+        CT[i,:] = ct
+    elif len(full_path) == 0:
+        subj_filt[i] = True
     
 df_node.loc[:,ct_labels] = CT
 
 
+# In[10]:
+
+
+np.sum(subj_filt)
+
+
+# In[11]:
+
+
+if any(subj_filt):
+    df = df.loc[~subj_filt]
+    df_node = df_node.loc[~subj_filt]
+
+
 # ## Load in cortical volume
 
-# In[9]:
+# In[12]:
 
 
 # subject filter
 subj_filt = np.zeros((df.shape[0],)).astype(bool)
 
 
-# In[10]:
+# In[13]:
 
 
 VOL = np.zeros((df.shape[0], num_parcels))
@@ -120,26 +144,29 @@ for (i, (index, row)) in enumerate(df.iterrows()):
     full_path = glob.glob(os.path.join(os.environ['VOLDIR'], file_name))
     if i == 0: print(full_path)    
     
-    img = nib.load(full_path[0])
-    v = np.array(img.dataobj)
-    v = v[v != 0]
-    unique_elements, counts_elements = np.unique(v, return_counts=True)
-    if len(unique_elements) == num_parcels:
-        VOL[i,:] = counts_elements
-    else:
-        print(str(index) + '. Warning: not all parcels present')
+    if len(full_path) > 0:
+        img = nib.load(full_path[0])
+        v = np.array(img.dataobj)
+        v = v[v != 0]
+        unique_elements, counts_elements = np.unique(v, return_counts=True)
+        if len(unique_elements) == num_parcels:
+            VOL[i,:] = counts_elements
+        else:
+            print(str(index) + '. Warning: not all parcels present')
+            subj_filt[i] = True
+    elif len(full_path) == 0:
         subj_filt[i] = True
     
 df_node.loc[:,vol_labels] = VOL
 
 
-# In[11]:
+# In[14]:
 
 
 np.sum(subj_filt)
 
 
-# In[12]:
+# In[15]:
 
 
 if any(subj_filt):
@@ -149,13 +176,13 @@ if any(subj_filt):
 
 # ## Save out
 
-# In[13]:
+# In[16]:
 
 
 os.environ['MODELDIR']
 
 
-# In[14]:
+# In[17]:
 
 
 # Save out
