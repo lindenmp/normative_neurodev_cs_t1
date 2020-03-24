@@ -9,6 +9,8 @@ import mayavi as my
 import surfer
 import math
 
+from matplotlib.pyplot import get_cmap
+
 def roi_to_vtx(roi_data, parcel_names, parc_file):
     # roi_data      = (num_nodes,) array vector of node-level data to plot onto surface
     # 
@@ -70,27 +72,57 @@ def roi_to_vtx(roi_data, parcel_names, parc_file):
     return vtx_data, vtx_data_min, vtx_data_max
 
 
-def brain_plot(roi_data, parcel_names, parc_file, fig_str, subject_id = 'lausanne125', hemi = 'lh', surf = 'inflated', color = 'coolwarm', center_anchor = 0):
+def brain_plot(roi_data, parcel_names, parc_file, fig_str, subject_id = 'fsaverage', hemi = 'lh', surf = 'inflated', color = 'coolwarm', center_anchor = 0, showcolorbar = False):
 
     vtx_data, plot_min, plot_max = roi_to_vtx(roi_data, parcel_names, parc_file)
 
-    if color == 'coolwarm':
-        if center_anchor == 0:
-            if abs(plot_max) > abs(plot_min): center_anchor = abs(plot_max)
-            elif abs(plot_max) < abs(plot_min): center_anchor = abs(plot_min)
-            else: center_anchor = abs(plot_max)
+    if np.all(vtx_data == -1000) == False:
+        if color == 'coolwarm':
+            if center_anchor == 0:
+                if abs(plot_max) > abs(plot_min): center_anchor = abs(plot_max)
+                elif abs(plot_max) < abs(plot_min): center_anchor = abs(plot_min)
+                else: center_anchor = abs(plot_max)
 
-            if center_anchor == -1000: center_anchor = 1
-        print(center_anchor)
-        
-        if center_anchor != 0:
+                if center_anchor == -1000: center_anchor = 1
+            print(center_anchor)
+            
+            if center_anchor != 0:
+                view = 'lat'
+                fname1 = view + '_' + fig_str + '.png'
+                fig = my.mlab.figure(size = (1000,1000))
+                fig = my.mlab.gcf()
+                brain = surfer.Brain(subject_id, hemi, surf, figure = fig, views = view, background = 'white', alpha = 1)
+                if subject_id == 'fsaverage': brain.add_morphometry("avg_sulc", colormap="binary", min = -3, max = 3, colorbar = False)
+                elif subject_id == 'lausanne125': brain.add_morphometry("avg_curv", colormap="binary", min = -.5, max = .5, colorbar = False)
+                brain.add_data(vtx_data, max = center_anchor, center = 0, thresh = -999, colormap = color, alpha = 1, colorbar = showcolorbar)
+                brain.add_annotation(parc_file, hemi = hemi, borders = True, alpha=.25, color = 'lightsteelblue')
+                my.mlab.savefig(figure = fig,filename = fname1)
+                my.mlab.close()
+
+                view = 'med'
+                fname2 = view + '_' + fig_str + '.png'
+                fig = my.mlab.figure(size = (1000,1000))
+                fig = my.mlab.gcf()
+                brain = surfer.Brain(subject_id, hemi, surf, figure = fig, views = view, background = 'white', alpha = 1)
+                if subject_id == 'fsaverage': brain.add_morphometry("avg_sulc", colormap="binary", min = -3, max = 3, colorbar = False)
+                elif subject_id == 'lausanne125': brain.add_morphometry("avg_curv", colormap="binary", min = -.5, max = .5, colorbar = False)
+                brain.add_data(vtx_data, max = center_anchor, center = 0, thresh = -999, colormap = color, alpha = 1, colorbar = showcolorbar)
+                brain.add_annotation(parc_file, hemi = hemi, borders = True, alpha=.25, color = 'lightsteelblue')
+                my.mlab.savefig(figure = fig,filename = fname2)
+                my.mlab.close()
+            else: print('There''s nothing to plot...')
+        elif color == 'hot':
+            if center_anchor != 0:
+                plot_max = center_anchor
+
             view = 'lat'
             fname1 = view + '_' + fig_str + '.png'
             fig = my.mlab.figure(size = (1000,1000))
             fig = my.mlab.gcf()
             brain = surfer.Brain(subject_id, hemi, surf, figure = fig, views = view, background = 'white', alpha = 1)
-            brain.add_morphometry("avg_sulc", colormap="binary", min = -3, max = 3, colorbar = False)
-            brain.add_data(vtx_data, max = center_anchor, center = 0, thresh = -999, colormap = color, alpha = 1, colorbar = False)
+            if subject_id == 'fsaverage': brain.add_morphometry("avg_sulc", colormap="binary", min = -3, max = 3, colorbar = False)
+            elif subject_id == 'lausanne125': brain.add_morphometry("avg_curv", colormap="binary", min = -.5, max = .5, colorbar = False)
+            brain.add_data(vtx_data, min = 0, max = plot_max, thresh = -999, colormap = color, alpha = 1, colorbar = showcolorbar)
             brain.add_annotation(parc_file, hemi = hemi, borders = True, alpha=.25, color = 'lightsteelblue')
             my.mlab.savefig(figure = fig,filename = fname1)
             my.mlab.close()
@@ -100,46 +132,21 @@ def brain_plot(roi_data, parcel_names, parc_file, fig_str, subject_id = 'lausann
             fig = my.mlab.figure(size = (1000,1000))
             fig = my.mlab.gcf()
             brain = surfer.Brain(subject_id, hemi, surf, figure = fig, views = view, background = 'white', alpha = 1)
-            brain.add_morphometry("avg_sulc", colormap="binary", min = -3, max = 3, colorbar = False)
-            brain.add_data(vtx_data, max = center_anchor, center = 0, thresh = -999, colormap = color, alpha = 1, colorbar = False)
+            if subject_id == 'fsaverage': brain.add_morphometry("avg_sulc", colormap="binary", min = -3, max = 3, colorbar = False)
+            elif subject_id == 'lausanne125': brain.add_morphometry("avg_curv", colormap="binary", min = -.5, max = .5, colorbar = False)
+            brain.add_data(vtx_data, min = 0, max = plot_max, thresh = -999, colormap = color, alpha = 1, colorbar = showcolorbar)
             brain.add_annotation(parc_file, hemi = hemi, borders = True, alpha=.25, color = 'lightsteelblue')
             my.mlab.savefig(figure = fig,filename = fname2)
             my.mlab.close()
-        else: print('There''s nothing to plot...')
-    elif color == 'hot':
-        if center_anchor != 0:
-            plot_max = center_anchor
-
-        view = 'lat'
-        fname1 = view + '_' + fig_str + '.png'
-        fig = my.mlab.figure(size = (1000,1000))
-        fig = my.mlab.gcf()
-        brain = surfer.Brain(subject_id, hemi, surf, figure = fig, views = view, background = 'white', alpha = 1)
-        brain.add_morphometry("avg_sulc", colormap="binary", min = -3, max = 3, colorbar = False)
-        brain.add_data(vtx_data, min = 0, max = plot_max, thresh = -999, colormap = color, alpha = 1, colorbar = False)
-        brain.add_annotation(parc_file, hemi = hemi, borders = True, alpha=.25, color = 'lightsteelblue')
-        my.mlab.savefig(figure = fig,filename = fname1)
-        my.mlab.close()
-
-        view = 'med'
-        fname2 = view + '_' + fig_str + '.png'
-        fig = my.mlab.figure(size = (1000,1000))
-        fig = my.mlab.gcf()
-        brain = surfer.Brain(subject_id, hemi, surf, figure = fig, views = view, background = 'white', alpha = 1)
-        brain.add_morphometry("avg_sulc", colormap="binary", min = -3, max = 3, colorbar = False)
-        brain.add_data(vtx_data, min = 0, max = plot_max, thresh = -999, colormap = color, alpha = 1, colorbar = False)
-        brain.add_annotation(parc_file, hemi = hemi, borders = True, alpha=.25, color = 'lightsteelblue')
-        my.mlab.savefig(figure = fig,filename = fname2)
-        my.mlab.close()
-    elif color == 'Accent':
-        if abs(plot_max) != abs(plot_min):
+        else:
             view = 'lat'
             fname1 = view + '_' + fig_str + '.png'
             fig = my.mlab.figure(size = (1000,1000))
             fig = my.mlab.gcf()
             brain = surfer.Brain(subject_id, hemi, surf, figure = fig, views = view, background = 'white', alpha = 1)
-            brain.add_morphometry("avg_sulc", colormap="binary", min = -3, max = 3, colorbar = False)
-            brain.add_data(vtx_data, min = 0, max = plot_max, thresh = -999, colormap = color, alpha = 1, colorbar = False)
+            if subject_id == 'fsaverage': brain.add_morphometry("avg_sulc", colormap="binary", min = -3, max = 3, colorbar = False)
+            elif subject_id == 'lausanne125': brain.add_morphometry("avg_curv", colormap="binary", min = -.5, max = .5, colorbar = False)
+            brain.add_data(vtx_data, min = 1, max = get_cmap('Pastel2').N, thresh = -999, colormap = color, alpha = 1, colorbar = showcolorbar)
             brain.add_annotation(parc_file, hemi = hemi, borders = True, alpha=.25, color = 'lightsteelblue')
             my.mlab.savefig(figure = fig,filename = fname1)
             my.mlab.close()
@@ -149,9 +156,11 @@ def brain_plot(roi_data, parcel_names, parc_file, fig_str, subject_id = 'lausann
             fig = my.mlab.figure(size = (1000,1000))
             fig = my.mlab.gcf()
             brain = surfer.Brain(subject_id, hemi, surf, figure = fig, views = view, background = 'white', alpha = 1)
-            brain.add_morphometry("avg_sulc", colormap="binary", min = -3, max = 3, colorbar = False)
-            brain.add_data(vtx_data, min = 0, max = plot_max, thresh = -999, colormap = color, alpha = 1, colorbar = False)
+            if subject_id == 'fsaverage': brain.add_morphometry("avg_sulc", colormap="binary", min = -3, max = 3, colorbar = False)
+            elif subject_id == 'lausanne125': brain.add_morphometry("avg_curv", colormap="binary", min = -.5, max = .5, colorbar = False)
+            brain.add_data(vtx_data, min = 1, max = get_cmap('Pastel2').N, thresh = -999, colormap = color, alpha = 1, colorbar = showcolorbar)
             brain.add_annotation(parc_file, hemi = hemi, borders = True, alpha=.25, color = 'lightsteelblue')
             my.mlab.savefig(figure = fig,filename = fname2)
             my.mlab.close()
-        else: print('There''s nothing to plot...')
+    else: print('There''s nothing to plot...')
+
