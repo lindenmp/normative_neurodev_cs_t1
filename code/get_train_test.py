@@ -29,22 +29,23 @@ plt.rcParams['svg.fonttype'] = 'none'
 
 sys.path.append('/Users/lindenmp/Dropbox/Work/ResProjects/NormativeNeuroDev_CrossSec_T1/code/func/')
 from proj_environment import set_proj_env
-from func import get_cmap
+sys.path.append('/Users/lindenmp/Dropbox/Work/git/pyfunc/')
+from func import my_get_cmap
 
 
-# In[3]:
+# In[4]:
 
 
 train_test_str = 'squeakycleanExclude'
-exclude_str = 'fsFinalExclude' # 't1Exclude' 'fsFinalExclude'
-parc_str = 'lausanne' # 'schaefer' 'lausanne'
-parc_scale = 250 # 200 400 | 60 125 250
+exclude_str = 't1Exclude' # 't1Exclude' 'fsFinalExclude'
+parc_str = 'schaefer' # 'schaefer' 'lausanne'
+parc_scale = 400 # 200 400 | 60 125 250
 _ = set_proj_env(train_test_str = train_test_str, exclude_str = exclude_str, parc_str = parc_str, parc_scale = parc_scale)
 
 
 # ### Setup output directory
 
-# In[4]:
+# In[5]:
 
 
 print(os.environ['TRTEDIR'])
@@ -53,7 +54,7 @@ if not os.path.exists(os.environ['TRTEDIR']): os.makedirs(os.environ['TRTEDIR'])
 
 # # Load in metadata
 
-# In[5]:
+# In[6]:
 
 
 # LTN and Health Status
@@ -72,12 +73,11 @@ demog = pd.read_csv(os.path.join(os.environ['DERIVSDIR'], 'pncDataFreeze20170905
 brain_vol = pd.read_csv(os.path.join(os.environ['DERIVSDIR'], 'pncDataFreeze20170905/n1601_dataFreeze/neuroimaging/t1struct/n1601_ctVol20170412.csv'))
 
 # GOASSESS Bifactor scores
-goassess = pd.read_csv('/Users/lindenmp/Dropbox/Work/ResData/PNC/GO1_clinical_factor_scores_psychosis_split_BIFACTOR.csv')
+goassess = pd.read_csv(os.path.join(os.environ['DERIVSDIR'], 'GO1_clinical_factor_scores_psychosis_split_BIFACTOR.csv'))
 # Psych summary
 psych = pd.read_csv(os.path.join(os.environ['DERIVSDIR'], 'pncDataFreeze20170905/n1601_dataFreeze/clinical/n1601_goassess_psych_summary_vars_20131014.csv'))
 # Psychosis summary
-psychosis = pd.read_csv('/Users/lindenmp/Dropbox/Work/ResData/PNC/n1601_diagnosis_dxpmr_20170509.csv')
-
+psychosis = pd.read_csv(os.path.join(os.environ['DERIVSDIR'], 'n1601_diagnosis_dxpmr_20170509.csv'))
 
 # merge
 df = health
@@ -95,14 +95,14 @@ print(df.shape[0])
 df.set_index(['bblid', 'scanid'], inplace = True)
 
 
-# In[6]:
+# In[7]:
 
 
 # Convert age to years
 df['ageAtScan1_Years'] = np.round(df.ageAtScan1/12, decimals=1)
 
 
-# In[7]:
+# In[8]:
 
 
 df.head()
@@ -110,7 +110,7 @@ df.head()
 
 # # Filter subjects
 
-# In[8]:
+# In[9]:
 
 
 # 1) Primary sample filter
@@ -122,13 +122,13 @@ df = df[df[exclude_str] == 0]
 print('N after T1 exclusion:', df.shape[0])
 
 
-# In[9]:
+# In[10]:
 
 
 df['averageManualRating'].unique()
 
 
-# In[10]:
+# In[11]:
 
 
 np.sum(df['averageManualRating'] == 2)
@@ -136,7 +136,7 @@ np.sum(df['averageManualRating'] == 2)
 
 # # Define train/test split
 
-# In[11]:
+# In[12]:
 
 
 if train_test_str == 'squeakycleanExclude':
@@ -154,7 +154,7 @@ if train_test_str == 'squeakycleanExclude':
 
 # ## Train/Test split
 
-# In[12]:
+# In[13]:
 
 
 # find unique ages
@@ -178,7 +178,7 @@ elif test_diff.size != 0:
 
 # ## Export
 
-# In[13]:
+# In[14]:
 
 
 header = [train_test_str, 'ageAtScan1', 'ageAtScan1_Years','sex','race2','handednessv2',
@@ -195,13 +195,13 @@ df.to_csv(os.path.join(os.environ['TRTEDIR'], 'df_pheno.csv'), columns = header)
 
 # # Plots
 
-# In[14]:
+# In[16]:
 
 
 if not os.path.exists(os.environ['FIGDIR']): os.makedirs(os.environ['FIGDIR'])
 os.chdir(os.environ['FIGDIR'])
 sns.set(style='white', context = 'paper', font_scale = 1)
-cmap = get_cmap('pair')
+cmap = my_get_cmap('pair')
 
 labels = ['Train', 'Test']
 phenos = ['Overall_Psychopathology','Psychosis_Positive','Psychosis_NegativeDisorg','AnxiousMisery','Externalizing','Fear']
@@ -212,13 +212,13 @@ print(phenos)
 
 # ## Age
 
-# In[15]:
+# In[17]:
 
 
 df['sex'].unique()
 
 
-# In[16]:
+# In[18]:
 
 
 np.sum(df.loc[df[train_test_str] == 1,'sex'] == 2)
@@ -226,7 +226,7 @@ np.sum(df.loc[df[train_test_str] == 1,'sex'] == 2)
 
 # Figure 2A
 
-# In[17]:
+# In[19]:
 
 
 f, axes = plt.subplots(1,2)
@@ -264,7 +264,7 @@ f.savefig('age_distributions.svg', dpi = 300, bbox_inches = 'tight', pad_inches 
 
 # Figure 2B
 
-# In[18]:
+# In[20]:
 
 
 df_rc = pd.melt(df, id_vars = train_test_str, value_vars = phenos)
@@ -278,10 +278,4 @@ ax.set_yticklabels(phenos_label_short)
 ax.set_ylabel('Psychopathology phenotypes')
 ax.set_xlabel('Phenotype score')
 f.savefig('phenos_distributions.svg', dpi = 300, bbox_inches = 'tight', pad_inches = 0)
-
-
-# In[ ]:
-
-
-
 

@@ -31,13 +31,13 @@ sys.path.append('/Users/lindenmp/Dropbox/Work/ResProjects/NormativeNeuroDev_Cros
 from proj_environment import set_proj_env
 
 
-# In[ ]:
+# In[3]:
 
 
 train_test_str = 'squeakycleanExclude'
-exclude_str = 'fsFinalExclude' # 't1Exclude' 'fsFinalExclude'
-parc_str = 'lausanne' # 'schaefer' 'lausanne'
-parc_scale = 250 # 200 400 | 60 125 250
+exclude_str = 't1Exclude' # 't1Exclude' 'fsFinalExclude'
+parc_str = 'schaefer' # 'schaefer' 'lausanne'
+parc_scale = 400 # 200 400 | 60 125 250
 parcel_names, parcel_loc, drop_parcels, num_parcels, yeo_idx, yeo_labels = set_proj_env(train_test_str = train_test_str, exclude_str = exclude_str,
                                                                             parc_str = parc_str, parc_scale = parc_scale)
 
