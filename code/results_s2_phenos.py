@@ -1,21 +1,28 @@
 #!/usr/bin/env python
 # coding: utf-8
 
-# # Results, section 2:
+# # Results, section 2: correlations between dimensional phenotypes and deviations from normative neurodevelopment
 
 # In[1]:
 
 
-import os, sys
+# Essentials
+import os, sys, glob
 import pandas as pd
 import numpy as np
+import nibabel as nib
+
+# Stats
 import scipy as sp
 from scipy import stats
+import statsmodels.api as sm
+import pingouin as pg
+
+# Plotting
 import seaborn as sns
 import matplotlib.pyplot as plt
 plt.rcParams['svg.fonttype'] = 'none'
-import statsmodels.api as sm
-import ptitprince as pt
+from mpl_toolkits.axes_grid1 import make_axes_locatable
 
 
 # In[2]:
@@ -23,7 +30,8 @@ import ptitprince as pt
 
 sys.path.append('/Users/lindenmp/Dropbox/Work/ResProjects/NormativeNeuroDev_CrossSec_T1/code/func/')
 from proj_environment import set_proj_env
-from func import run_corr, get_fdr_p, update_progress, get_null_p, get_cmap, get_fdr_p_df, get_sys_summary, prop_bar_plot, dependent_corr
+sys.path.append('/Users/lindenmp/Dropbox/Work/git/pyfunc/')
+from func import run_corr, get_fdr_p, run_pheno_correlations, prop_bar_plot, get_sys_summary, get_fdr_p_df, get_sys_prop, update_progress
 
 
 # In[3]:
@@ -31,7 +39,7 @@ from func import run_corr, get_fdr_p, update_progress, get_null_p, get_cmap, get
 
 train_test_str = 'squeakycleanExclude'
 exclude_str = 't1Exclude' # 't1Exclude' 'fsFinalExclude'
-parc_str = 'schaefer'
+parc_str = 'schaefer' # 'schaefer' 'lausanne'
 parc_scale = 400 # 200 400 | 60 125
 primary_covariate = 'ageAtScan1_Years'
 extra_str = ''
@@ -42,641 +50,368 @@ parcel_names, parcel_loc, drop_parcels, num_parcels, yeo_idx, yeo_labels = set_p
 # In[4]:
 
 
-sns.set(style='white', context = 'paper', font_scale = 1)
+os.environ['NORMATIVEDIR']
 
 
 # In[5]:
 
 
-run_correlations = False
-compute_perm_stats = False
-num_perms = 1000
+outdir = os.path.join(os.environ['NORMATIVEDIR'],'analysis_outputs')
+if not os.path.exists(outdir): os.makedirs(outdir)
 
 
 # In[6]:
 
 
-os.environ['NORMATIVEDIR']
+phenos = ['Overall_Psychopathology','Psychosis_Positive','Psychosis_NegativeDisorg','AnxiousMisery','Externalizing','Fear']
+phenos_label_short = ['Ov. Psych.', 'Psy. (pos.)', 'Psy. (neg.)', 'Anx.-mis.', 'Ext.', 'Fear']
+phenos_label = ['Overall Psychopathology','Psychosis (Positive)','Psychosis (Negative)','Anxious-Misery','Externalizing','Fear']
+metrics = ['ct', 'vol']
+metrics_label_short = ['Thickness', 'Volume']
+metrics_label = ['Thickness', 'Volume']
 
+
+# ## Plots
 
 # In[7]:
 
 
-metrics = ('ct', 'vol')
-phenos = ('Overall_Psychopathology','Psychosis_Positive','Psychosis_NegativeDisorg','AnxiousMisery','Externalizing','Fear')
+if not os.path.exists(os.environ['FIGDIR']): os.makedirs(os.environ['FIGDIR'])
+os.chdir(os.environ['FIGDIR'])
+sns.set(style='white', context = 'paper', font_scale = 1)
 
 
-# ## Load data pre-nispat data
+# ## Load data
 
 # In[8]:
 
 
 # Train
 df_train = pd.read_csv(os.path.join(os.environ['NORMATIVEDIR'], 'train.csv'))
-df_train.set_index(['bblid', 'scanid'], inplace = True); print(df_train.shape)
+df_train.set_index(['bblid', 'scanid'], inplace = True)
 df_node_train = pd.read_csv(os.path.join(os.environ['NORMATIVEDIR'], 'resp_train.csv'))
 df_node_train.set_index(['bblid', 'scanid'], inplace = True)
 
 # Test
-df = pd.read_csv(os.path.join(os.environ['NORMATIVEDIR'], 'test.csv'))
-df.set_index(['bblid', 'scanid'], inplace = True); print(df.shape)
-df_node = pd.read_csv(os.path.join(os.environ['NORMATIVEDIR'], 'resp_test.csv'))
-df_node.set_index(['bblid', 'scanid'], inplace = True)
+df_test = pd.read_csv(os.path.join(os.environ['NORMATIVEDIR'], 'test.csv'))
+df_test.set_index(['bblid', 'scanid'], inplace = True)
+df_node_test = pd.read_csv(os.path.join(os.environ['NORMATIVEDIR'], 'resp_test.csv'))
+df_node_test.set_index(['bblid', 'scanid'], inplace = True)
 
+# concat
+df = pd.concat((df_train, df_test), axis = 0); print(df.shape)
+df_node = pd.concat((df_node_train, df_node_test), axis = 0); print(df_node.shape)
 
-# ### Regress age/sex out of psychopathology phenotypes and node features (not deviations)
 
 # In[9]:
 
 
-df_nuis = df.loc[:,[primary_covariate,'sex_adj']]
-df_nuis = sm.add_constant(df_nuis)
-
-# phenos
-mdl = sm.OLS(df.loc[:,phenos], df_nuis).fit()
-y_pred = mdl.predict(df_nuis)
-y_pred.columns = phenos
-df.loc[:,phenos] = df.loc[:,phenos] - y_pred
-
-# df_node
-cols = df_node.columns
-mdl = sm.OLS(df_node.loc[:,cols], df_nuis).fit()
-y_pred = mdl.predict(df_nuis)
-y_pred.columns = cols
-df_node.loc[:,cols] = df_node.loc[:,cols] - y_pred
+np.sum(df.loc[:,'sex'] == 1)/df.shape[0]
 
 
 # In[10]:
 
 
-# phenos = ('Overall_Psychopathology','Psychosis_Positive')
-# phenos = ('Psychosis_NegativeDisorg','AnxiousMisery')
-# phenos = ('Externalizing','Fear')
+np.sum(df.loc[:,'squeakycleanExclude'] == 0)
 
-
-# ## Age effects
 
 # In[11]:
 
 
-# regress out sex
-df_nuis = df_train.loc[:,'sex_adj']
-df_nuis = sm.add_constant(df_nuis)
-
-cols = df_node_train.columns
-mdl = sm.OLS(df_node_train.loc[:,cols].astype(float), df_nuis.astype(float)).fit()
-y_pred = mdl.predict(df_nuis)
-y_pred.columns = cols
-df_node_train.loc[:,cols] = df_node_train.loc[:,cols] - y_pred
-
-
-# In[12]:
-
-
-# age effect on training set
-df_age_effect = run_corr(df_train[primary_covariate], df_node_train, typ = 'spearmanr'); df_age_effect['p_fdr'] = get_fdr_p(df_age_effect['p'])
-age_alpha = 0.05
-age_filter = df_age_effect['p_fdr'].values < age_alpha
-
-
-# In[13]:
-
-
-age_filter.sum()
+np.sum(df.loc[:,'squeakycleanExclude'] == 1)
 
 
 # ## Load nispat outputs
 
+# In[12]:
+
+
+z_cv = np.loadtxt(os.path.join(os.environ['NORMATIVEDIR'], 'cv/Z.txt'), delimiter = ' ').transpose()
+df_z_cv = pd.DataFrame(data = z_cv, index = df_node_train.index, columns = df_node_train.columns)
+
+z = np.loadtxt(os.path.join(os.environ['NORMATIVEDIR'], 'Z.txt'), delimiter = ' ').transpose()
+df_z_test = pd.DataFrame(data = z, index = df_node_test.index, columns = df_node_test.columns)
+
+# concat
+df_z = pd.concat((df_z_cv,df_z_test), axis = 0); print(df_z.shape)
+
+
+# ### Regress age/sex out of psychopathology phenotypes
+
+# In[13]:
+
+
+df_nuis = df.loc[:,[primary_covariate,'sex_adj']]
+df_nuis = sm.add_constant(df_nuis)
+
+mdl = sm.OLS(df.loc[:,phenos], df_nuis).fit()
+y_pred = mdl.predict(df_nuis)
+y_pred.columns = phenos
+df.loc[:,phenos] = df.loc[:,phenos] - y_pred
+
+# Note, regressing out age/sex from the deviations as well as the phenotypes makes no difference to the results
+# # df_z
+# cols = df_z.columns
+# mdl = sm.OLS(df_z.loc[:,cols], df_nuis).fit()
+# y_pred = mdl.predict(df_nuis)
+# y_pred.columns = cols
+# df_z.loc[:,cols] = df_z.loc[:,cols] - y_pred
+
+
 # In[14]:
 
 
-smse = np.loadtxt(os.path.join(os.environ['NORMATIVEDIR'], 'smse.txt'), delimiter = ' ').transpose()
-df_smse = pd.DataFrame(data = smse, index = df_node.columns)
+f, ax = plt.subplots(1,len(phenos))
+f.set_figwidth(len(phenos)*5)
+f.set_figheight(5)
 
-z = np.loadtxt(os.path.join(os.environ['NORMATIVEDIR'], 'Z.txt'), delimiter = ' ').transpose()
-df_z = pd.DataFrame(data = z, index = df_node.index, columns = df_node.columns)
+for i, pheno in enumerate(phenos):
+    sns.distplot(df.loc[:,pheno], ax = ax[i])
+    ax[i].set_xlabel(pheno)
 
 
 # In[15]:
 
 
-smse_thresh = 1
-smse_filter = df_smse.values < smse_thresh
-smse_filter = smse_filter.reshape(-1)
+for pheno in phenos:
+    print(sp.stats.spearmanr(df.loc[:,'averageManualRating'],df.loc[:,pheno]))
 
+
+# ## Setup region filter
+# ### regions with SMSE <1 in normative model
 
 # In[16]:
 
 
-smse_filter.sum()
+smse = np.loadtxt(os.path.join(os.environ['NORMATIVEDIR'], 'smse.txt'), delimiter = ' ').transpose()
+df_smse = pd.DataFrame(data = smse, index = df_z.columns)
 
-
-# ### The interpretation of the z-deviations varies as a function of the age-effect from which the normative model is primarily derived.
-# ### For instance, if the normative model predicts a _decrease_ in y with age, then _positive deviations_ may be interpreted as a **_delay_** in this maturational reduction, wheras _negative deviations_ may be interpreted as an _advancement_ in this maturational reduction.
-# ### However, if the normative model predicts an _increase_ in y with age, then the interpretation of the deviations is reversed. That is:
-# #### IF predicted change = negative: _positive deviations_ = **_delay_** || _negative deviations_ = **_advance_**
-# #### IF predicted change = positive: _positive deviations_ = **_advance_** || _negative deviations_ = **_delay_**
 
 # In[17]:
 
 
-# boolean that designates which regions carry with positive predicted change.
-nm_is_pos = df_age_effect['coef'] > 0
-print(nm_is_pos.sum())
+smse_thresh = 1
+region_filter = df_smse.iloc[:,0] < smse_thresh
 
-# flipping the z-stats in these regions has the effect of standardising their interpration across the brain to be inline
-# with the negative predicted change statement above
-df_z.loc[:,nm_is_pos] = df_z.loc[:,nm_is_pos] * -1
-
-
-# ## Get pheno-metric relationshisps
 
 # In[18]:
 
 
-if run_correlations:
-    df_pheno = pd.DataFrame(columns = ['pheno','node','coef', 'p'])
-    df_corr_input = pd.concat((df.loc[:,phenos], df_node), axis = 1)
-
-    for pheno in phenos:
-        print(pheno)
-        df_tmp = pd.DataFrame(index = df_node.columns, columns = ['coef', 'p'])
-        for col in df_node.columns:
-            df_tmp.loc[col,'coef'] = sp.stats.spearmanr(df_corr_input[pheno], df_corr_input[col])[0]
-            df_tmp.loc[col,'p'] = sp.stats.spearmanr(df_corr_input[pheno], df_corr_input[col])[1]
-        df_tmp.reset_index(inplace = True); df_tmp.rename(index=str, columns={'index': 'node'}, inplace = True); df_tmp['pheno'] = pheno
-        df_pheno = df_pheno.append(df_tmp, sort = False)
-
-    df_pheno.set_index(['pheno','node'], inplace = True)
+region_filter.sum()
 
 
-# ### Get null for pheno-metric
+# ## Get pheno-nispat relationships
+
+# ### Regional
 
 # In[19]:
 
 
-if compute_perm_stats:
-    for pheno in phenos:
-        # Set seed for reproducibility
-        np.random.seed(0)
-        null = np.zeros((df_node.shape[1],num_perms))
-        df_tmp = pd.concat((df.loc[:,phenos], df_node), axis = 1)
-                                      
-        for j in range(num_perms):
-            update_progress(j / num_perms, pheno)
-            df_corr_input = df_tmp.copy()
-            df_corr_input.loc[:,df_node.columns] = df_corr_input.loc[:,df_node.columns].sample(frac = 1).values
-            for i, col in enumerate(df_node.columns):
-                null[i,j] = sp.stats.spearmanr(df_corr_input[pheno], df_corr_input[col])[0]
-
-        update_progress(1, pheno)
-        np.save(os.path.join(os.environ['NORMATIVEDIR'], 'null_' + pheno + '_m'), null)
+method = 'spearman'
 
 
 # In[20]:
 
 
-if compute_perm_stats == False:
-    nulls = {'Overall_Psychopathology': np.load(os.path.join(os.environ['NORMATIVEDIR'], 'null_Overall_Psychopathology_m.npy')),
-            'Psychosis_Positive': np.load(os.path.join(os.environ['NORMATIVEDIR'], 'null_Psychosis_Positive_m.npy')),
-            'Psychosis_NegativeDisorg': np.load(os.path.join(os.environ['NORMATIVEDIR'], 'null_Psychosis_NegativeDisorg_m.npy')),
-            'AnxiousMisery': np.load(os.path.join(os.environ['NORMATIVEDIR'], 'null_AnxiousMisery_m.npy')),
-            'Externalizing': np.load(os.path.join(os.environ['NORMATIVEDIR'], 'null_Externalizing_m.npy')),
-            'Fear': np.load(os.path.join(os.environ['NORMATIVEDIR'], 'null_Fear_m.npy'))}
+assign_p = 'permutation'
 
-
-# ## Get pheno-nispat relationships
 
 # In[21]:
 
 
-if run_correlations:
-    df_pheno_z = pd.DataFrame(columns = ['pheno','node','coef', 'p'])
-    df_corr_input = pd.concat((df.loc[:,phenos], df_z), axis = 1)
+if assign_p == 'permutation':
+    nulldir = os.path.join(os.environ['NORMATIVEDIR'], 'nulls_z')
+#     nulldir = os.path.join(os.environ['NORMATIVEDIR'], 'nulls_z_agesex')
+    if not os.path.exists(nulldir): os.makedirs(nulldir)
+    df_pheno_z = run_pheno_correlations(df.loc[:,phenos], df_z, method = method, assign_p = assign_p, nulldir = nulldir)
+elif assign_p == 'parametric':
+    df_pheno_z = run_pheno_correlations(df.loc[:,phenos], df_z, method = method, assign_p = assign_p)
 
-    for pheno in phenos:
-        print(pheno)
-        df_tmp = pd.DataFrame(index = df_z.columns, columns = ['coef', 'p'])
-        for col in df_z.columns:
-            df_tmp.loc[col,'coef'] = sp.stats.spearmanr(df_corr_input[pheno], df_corr_input[col])[0]
-            df_tmp.loc[col,'p'] = sp.stats.spearmanr(df_corr_input[pheno], df_corr_input[col])[1]
-        df_tmp.reset_index(inplace = True); df_tmp.rename(index=str, columns={'index': 'node'}, inplace = True); df_tmp['pheno'] = pheno
-        df_pheno_z = df_pheno_z.append(df_tmp, sort = False)
-
-    df_pheno_z.set_index(['pheno','node'], inplace = True)
-    df_pheno_z = df_pheno_z.astype(float)
-
-
-# ### Get null for pheno-nispat 
 
 # In[22]:
 
 
-if compute_perm_stats:
-    for pheno in phenos:
-        null = np.zeros((df_z.shape[1],num_perms))
+# correct multiple comparisons. We do this across brain regions and phenotypes (e.g., 400*6 = 2400 tests)
+df_p_corr = pd.DataFrame(index = df_pheno_z.index, columns = ['p-corr']) # output dataframe
 
-        for j in range(num_perms):
-            update_progress(j / num_perms, pheno)
-            # load permuted z-stats
-            permdir = os.path.join(os.environ['NORMATIVEDIR'], 'perm_all/perm_' + str(j))
-            z_file = os.path.join(permdir, 'Z.txt')
-            z_p = np.loadtxt(z_file, delimiter = ' ').transpose()
-            z_p[:,nm_is_pos.values] = z_p[:,nm_is_pos.values] * -1
-            z_p = pd.DataFrame(data = z_p, index = df_z.index, columns = df_z.columns)
-            df_corr_input = pd.concat((df.loc[:,phenos], z_p), axis = 1)
-            
-            for i, col in enumerate(df_z.columns):
-                null[i,j] = sp.stats.spearmanr(df_corr_input[pheno], df_corr_input[col])[0]
-        update_progress(1, pheno)
-
-        np.save(os.path.join(os.environ['NORMATIVEDIR'], 'null_' + pheno + '_z_pheno-res'), null)
+for metric in metrics:
+    p_corr = get_fdr_p(df_pheno_z.loc[:,'p'].filter(regex = metric)) # correct p-values for metric
+    p_corr_tmp = pd.DataFrame(index = df_pheno_z.loc[:,'p'].filter(regex = metric).index, columns = ['p-corr'], data = p_corr) # set to dataframe with correct indices
+    df_pheno_z.loc[p_corr_tmp.index, 'p-corr'] = p_corr_tmp # store using index matching
 
 
 # In[23]:
 
 
-if compute_perm_stats == False:
-    nulls_z = {'Overall_Psychopathology': np.load(os.path.join(os.environ['NORMATIVEDIR'], 'null_Overall_Psychopathology_z_pheno-res.npy')),
-        'Psychosis_Positive': np.load(os.path.join(os.environ['NORMATIVEDIR'], 'null_Psychosis_Positive_z_pheno-res.npy')),
-        'Psychosis_NegativeDisorg': np.load(os.path.join(os.environ['NORMATIVEDIR'], 'null_Psychosis_NegativeDisorg_z_pheno-res.npy')),
-        'AnxiousMisery': np.load(os.path.join(os.environ['NORMATIVEDIR'], 'null_AnxiousMisery_z_pheno-res.npy')),
-        'Externalizing': np.load(os.path.join(os.environ['NORMATIVEDIR'], 'null_Externalizing_z_pheno-res.npy')),
-        'Fear': np.load(os.path.join(os.environ['NORMATIVEDIR'], 'null_Fear_z_pheno-res.npy'))}
+for pheno in phenos:
+    for metric in metrics:
+        print(pheno, metric, np.sum(df_pheno_z.filter(regex = metric, axis = 0).filter(regex = pheno, axis = 0).loc[:,'p-corr'] < .05) / num_parcels * 100, '% significant effects (fdr)')
+    print('')
 
 
 # In[24]:
 
 
-f, ax = plt.subplots(1,len(metrics))
-f.set_figwidth(15)
-f.set_figheight(5)
-for i, metric in enumerate(metrics):
-    ax[i].set_title(metric)
-    ax[i].set_xlabel('coefficients')
-    age_filt = df_age_effect.filter(regex = metric, axis = 0)['p_fdr'].values < age_alpha
-    smse_filt = df_smse.filter(regex = metric, axis = 0).values < smse_thresh
-    smse_filt = smse_filt.reshape(-1)
-    region_filt = np.logical_and(age_filt,smse_filt)
-    
-    for pheno in phenos:
-#         null = nulls[pheno]
-        null = nulls_z[pheno]
-        idx = [any(b in s for b in metric) for s in list(df_z.columns)]
-        null = null[idx,:] # retain only one metric
-        null = null[region_filt,:] # retain only regions that pass QA criteria
-        
-        # collapse all regions
-#         sns.distplot(np.abs(null.reshape(-1,1)[~np.isnan(null.reshape(-1,1))]), ax = ax[i])
-        # pick a region
-#         sns.distplot(np.abs(null[0,:]), ax = ax[i])
-        # max value for each region
-        sns.distplot(np.nanmax(np.abs(null), axis = 1), ax = ax[i])
-    
-    ax[i].legend(phenos)
+alpha = 0.05
+print(alpha)
 
 
 # In[25]:
 
 
-if run_correlations == False:
-    df_pheno = pd.read_csv(os.path.join(os.environ['NORMATIVEDIR'], 'df_corr_pheno.csv'))
-    df_pheno.set_index(['pheno','node'], inplace = True)
-    
-    df_pheno_z = pd.read_csv(os.path.join(os.environ['NORMATIVEDIR'], 'df_corr_pheno_z.csv'))
-    df_pheno_z.set_index(['pheno','node'], inplace = True)
+x = df_pheno_z['p-corr'].values < alpha
+df_pheno_z['sig'] = x
+
+x = x.reshape(1,-1)
+y = np.matlib.repmat(region_filter, 1, len(phenos))
+
+my_bool = np.concatenate((x, y), axis = 0); region_filt = np.all(my_bool, axis = 0); df_pheno_z['sig_smse'] = region_filt
+
+print(str(np.sum(df_pheno_z['sig'] == True)) + ' significant effects (fdr)')
+print(str(np.sum(df_pheno_z['sig_smse'] == True)) + ' significant effects (fdr)')
 
 
 # In[26]:
 
 
 for pheno in phenos:
-    df_pheno.loc[pheno,'p_perm'] = get_null_p(df_pheno.loc[pheno,'coef'].values, nulls[pheno])
-df_pheno.loc[:,'p_perm_fdr'] = get_fdr_p(df_pheno.loc[:,'p_perm'])
-print(str(np.sum(df_pheno['p_perm_fdr'] < .05)) + ' significant effects (fdr)')
+    for metric in metrics:
+        print(pheno, metric, np.sum(df_pheno_z.loc[pheno,'sig_smse'].filter(regex = metric) == True) / num_parcels * 100, '% significant effects (fdr)')
+    print('')
 
 
 # In[27]:
 
 
-for pheno in phenos:
-    df_pheno_z.loc[pheno,'p_perm'] = get_null_p(df_pheno_z.loc[pheno,'coef'].values, nulls_z[pheno])    
-df_pheno_z.loc[:,'p_perm_fdr'] = get_fdr_p(df_pheno_z.loc[:,'p_perm'])
-print(str(np.sum(df_pheno_z['p_perm_fdr'] < .05)) + ' significant effects (fdr)')
+metric = 'vol'
 
 
 # In[28]:
 
 
-alpha = 0.05
-print(len(phenos))
-print(alpha)
+vals = np.zeros(len(phenos))
+
+for p, pheno in enumerate(phenos):
+    vals[p] = np.sum(df_pheno_z.loc[pheno,'sig_smse'].filter(regex = metric) == True) / num_parcels * 100
+
+idx_perc_sig = np.argsort(vals)[::-1]
+
+phenos_ordered = [phenos[i] for i in idx_perc_sig]
+phenos_label_ordered = [phenos_label[i] for i in idx_perc_sig]
+
+phenos_ordered
 
 
 # In[29]:
 
 
-x = df_pheno['p_perm_fdr'].values < alpha
-df_pheno['sig'] = x
+sns.set(style='white', context = 'talk', font_scale = 0.8)
+f, ax = plt.subplots()
+f.set_figwidth(3)
+f.set_figheight(3.5)
 
-x = x.reshape(1,-1)
-y = np.matlib.repmat(age_filter, 1, len(phenos))
-z = np.matlib.repmat(smse_filter, 1, len(phenos))
+ax.barh(y = np.arange(len(phenos)), width = vals[idx_perc_sig], color = 'white', edgecolor = 'black', linewidth = 3)
+ax.set_yticks(np.arange(len(phenos)))
+ax.set_yticklabels(phenos_label_ordered)
+ax.set_xlabel('Percentage of significant correlations')
+f.savefig('perce_sig_corrs', dpi = 300, bbox_inches = 'tight', pad_inches = 0)
 
-my_bool = np.concatenate((x, y)); region_filter = np.all(my_bool, axis = 0); df_pheno['sig_age'] = region_filter
-my_bool = np.concatenate((x, y, z)); region_filter = np.all(my_bool, axis = 0); df_pheno['sig_age_smse'] = region_filter
 
-print(str(np.sum(df_pheno['sig'] == True)) + ' significant effects (fdr)')
-print(str(np.sum(df_pheno['sig_age'] == True)) + ' significant effects (fdr)')
-print(str(np.sum(df_pheno['sig_age_smse'] == True)) + ' significant effects (fdr)')
-
-############
-x = df_pheno_z['p_perm_fdr'].values < alpha
-df_pheno_z['sig'] = x
-
-x = x.reshape(1,-1)
-y = np.matlib.repmat(age_filter, 1, len(phenos))
-z = np.matlib.repmat(smse_filter, 1, len(phenos))
-
-my_bool = np.concatenate((x, y)); region_filter = np.all(my_bool, axis = 0); df_pheno_z['sig_age'] = region_filter
-my_bool = np.concatenate((x, y, z)); region_filter = np.all(my_bool, axis = 0); df_pheno_z['sig_age_smse'] = region_filter
-
-print(str(np.sum(df_pheno_z['sig'] == True)) + ' significant effects (fdr)')
-print(str(np.sum(df_pheno_z['sig_age'] == True)) + ' significant effects (fdr)')
-print(str(np.sum(df_pheno_z['sig_age_smse'] == True)) + ' significant effects (fdr)')
-
+# ## Save out
 
 # In[30]:
 
 
-for pheno in phenos:
-    print(pheno + ': ' + str(np.sum(df_pheno.loc[pheno]['sig_age_smse'] == True)) + ' significant effects (fdr)')
-
-
-# In[31]:
-
-
-for pheno in phenos:
-    print(pheno + ': ' + str(np.sum(df_pheno_z.loc[pheno]['sig_age_smse'] == True)) + ' significant effects (fdr)')
-
-
-# In[32]:
-
-
-if run_correlations:
-    df_pheno.to_csv(os.path.join(os.environ['NORMATIVEDIR'], 'df_corr_pheno.csv'))
-    df_pheno_z.to_csv(os.path.join(os.environ['NORMATIVEDIR'], 'df_corr_pheno_z.csv'))
-
-
-# # Plots
-
-# In[33]:
-
-
-if not os.path.exists(os.environ['FIGDIR']): os.makedirs(os.environ['FIGDIR'])
-os.chdir(os.environ['FIGDIR'])
-sns.set(style='white', context = 'paper', font_scale = 1)
-cmap = get_cmap('pair')
-
-phenos = ('Overall_Psychopathology','Psychosis_Positive','Psychosis_NegativeDisorg','AnxiousMisery','Externalizing','Fear')
-phenos_label_short = ('Ov. Psych.', 'Psy. (pos.)', 'Psy. (neg.)', 'Anx.-mis.', 'Ext.', 'Fear')
-phenos_label = ('Overall Psychopathology','Psychosis (Positive)','Psychosis (Negative)','Anxious-Misery','Externalizing','Fear')
-metrics = ('ct', 'vol')
-metrics_label_short = ('Thickness', 'Volume')
-metrics_label = ('Thickness', 'Volume')
-
-print(phenos)
-print(metrics)
-
-metrics_labels = list()
-for metric in metrics:
-    tmp_labels = [metric + '_' + str(i) for i in range(num_parcels)]
-    metrics_labels = metrics_labels + tmp_labels
-
-
-# In[34]:
-
-
-region_filter = np.logical_and(age_filter,smse_filter)
-region_filter.sum()
-
-
-# In[35]:
-
-
-r = pd.Series(index = phenos)
-p = pd.Series(index = phenos)
-
-for pheno in phenos:
-    region_filt = np.logical_or(region_filter.reshape(num_parcels,len(metrics))[:,0],region_filter.reshape(num_parcels,len(metrics))[:,1])
-    x = df_pheno_z.loc[pheno,'coef'].filter(regex = metrics[0], axis = 0)[region_filt]
-    y = df_pheno_z.loc[pheno,'coef'].filter(regex = metrics[1], axis = 0)[region_filt]
-    
-    r[pheno] = sp.stats.spearmanr(x, y)[0]
-    p[pheno] = sp.stats.spearmanr(x, y)[1]
-p = get_fdr_p(p, alpha = 0.05)
-
-
-# In[36]:
-
-
-r
-
-
-# In[37]:
-
-
-r[p<.05]
-
-
-# ## Number of sig effects
-
-# In[38]:
-
-
-arrays = [tuple(['pre-nm'] * len(metrics) + ['nm'] * len(metrics)), metrics + metrics]
-my_index = pd.MultiIndex.from_arrays(arrays, names=('analysis', 'metric'))
-pos_counts = pd.DataFrame(index = my_index, columns = phenos)
-neg_counts = pd.DataFrame(index = my_index, columns = phenos)
-
-
-# In[39]:
-
-
-for pheno in phenos:
-    for metric in metrics:
-        age_filt = df_age_effect.filter(regex = metric, axis = 0)['p_fdr'].values < age_alpha
-        smse_filt = df_smse.filter(regex = metric, axis = 0).values < smse_thresh
-        smse_filt = smse_filt.reshape(-1)
-        region_filt = np.logical_and(age_filt,smse_filt)
-        
-        df_tmp = df_pheno.loc[pheno,['coef','sig_age_smse']].filter(regex = metric, axis = 0).copy()
-        pos_counts.loc[('pre-nm',metric),pheno] = df_tmp.loc[df_tmp['coef']>0,'sig_age_smse'].sum() / num_parcels*100
-        neg_counts.loc[('pre-nm',metric),pheno] = df_tmp.loc[df_tmp['coef']<0,'sig_age_smse'].sum() / num_parcels*100
-        
-        df_tmp = df_pheno_z.loc[pheno,['coef','sig_age_smse']].filter(regex = metric, axis = 0).copy()
-        pos_counts.loc[('nm',metric),pheno] = df_tmp.loc[df_tmp['coef']>0,'sig_age_smse'].sum() / num_parcels*100
-        neg_counts.loc[('nm',metric),pheno] = df_tmp.loc[df_tmp['coef']<0,'sig_age_smse'].sum() / num_parcels*100
-
-
-# In[40]:
-
-
-pos_counts
-
-
-# In[41]:
-
-
-if np.max(pos_counts.values) > np.max(neg_counts.values):
-    plot_max = np.round(np.max(pos_counts.values),0)
-elif np.max(pos_counts.values) < np.max(neg_counts.values):
-    plot_max = np.round(np.max(neg_counts.values),0)
-elif np.max(pos_counts.values) == np.max(neg_counts.values):
-    plot_max = np.round(np.max(pos_counts.values),0)
-print(plot_max)
-
-
-# Figure 3A
-
-# In[42]:
-
-
-f, ax = plt.subplots()
-f.set_figwidth(3)
-f.set_figheight(2)
-ax = sns.heatmap(np.round(pos_counts.astype(float),1), center = 0, vmax = plot_max, annot = True, cmap = 'RdBu_r')
-ax.set_xticklabels(phenos_label_short, rotation = 45)
-ax.set_yticklabels(metrics_label_short + metrics_label_short)
-ax.set_ylabel('')
-f.savefig('pos_count.svg', dpi = 300, bbox_inches = 'tight', pad_inches = 0)
-
-
-# In[43]:
-
-
-f, ax = plt.subplots()
-f.set_figwidth(3)
-f.set_figheight(2)
-ax = sns.heatmap(np.round(neg_counts.astype(float),1), center = 0, vmax = plot_max, annot = True, cmap = 'RdBu', cbar_kws={'label': 'Percentage of regions'})
-ax.set_xticklabels(phenos_label_short, rotation = 45)
-ax.set_yticklabels('')
-ax.set_ylabel('')
-f.savefig('neg_count.svg', dpi = 300, bbox_inches = 'tight', pad_inches = 0)
-
-
-# In[44]:
-
-
-num_regions = pd.DataFrame(index = metrics, columns = phenos)
-prop_normative = pd.DataFrame(index = metrics, columns = phenos)
-counts_greater = pd.DataFrame(index = metrics, columns = phenos)
-counts_smaller = pd.DataFrame(index = metrics, columns = phenos)
-
-for i, metric in enumerate(metrics):
-    for j, pheno in enumerate(phenos):
-        df_tmp = df_pheno.loc[pheno,['coef','sig_age_smse']].filter(regex = metric, axis = 0).copy()
-        df_tmp_z = df_pheno_z.loc[pheno,['coef','sig_age_smse']].filter(regex = metric, axis = 0).copy()
-        mask_idx = np.logical_or(df_tmp['sig_age_smse'],df_tmp_z['sig_age_smse'])
-        num_regions.loc[metric,pheno] = mask_idx.sum()
-        prop_normative.loc[metric,pheno] = np.round(df_tmp_z['sig_age_smse'].sum() / mask_idx.sum() * 100,0)
-        
-        R = pd.DataFrame(index = df_tmp_z.index, columns = ['r','p'])
-        count_great = 0
-        count_small = 0
-        for col, _ in mask_idx[mask_idx].iteritems():
-            xy = np.abs(df_tmp_z.loc[col,'coef']) # correlation between phenotype and deviation
-            xz = np.abs(df_tmp.loc[col,'coef']) # correlation between phenotype and brain feature
-            yz = np.abs(sp.stats.spearmanr(df_node[col],df_z[col])[0]) # correlation deviation and brain feature
-            r = dependent_corr(xy, xz, yz, df_z.shape[0], twotailed=True) # test for difference between correlations
-            R.loc[col,'r'] = r[0]
-            R.loc[col,'p'] = r[1]
-        R['p_fdr'] = get_fdr_p(R['p'])
-        
-        # store
-        counts_greater.loc[metric,pheno] = R[np.logical_and(R['r'] > 0,R['p_fdr']<.05)].shape[0]
-        counts_smaller.loc[metric,pheno] = R[np.logical_and(R['r'] < 0,R['p_fdr']<.05)].shape[0]
-
-
-# In[45]:
-
-
-num_regions
-
-
-# In[46]:
-
-
-prop_normative
-
-
-# In[47]:
-
-
-counts_greater
-
-
-# In[48]:
-
-
-counts_smaller
+df.to_csv(os.path.join(outdir,'df.csv'))
+df_z.to_csv(os.path.join(outdir,'df_z.csv'))
+df_pheno_z.to_csv(os.path.join(outdir,'df_pheno_z.csv'))
+region_filter.to_csv(os.path.join(outdir,'region_filter.csv'))
 
 
 # ## Summarise effects over Yeo networks
 
-# In[49]:
+# In[31]:
 
 
 sns.set(style='white', context = 'paper', font_scale = 0.9)
 
 
-# Figure 4
-
-# In[50]:
+# In[32]:
 
 
-for i, pheno in enumerate(phenos):
-    pheno_label = phenos_label[i]
-    for j, metric in enumerate(metrics):
-        metric_label = metrics_label[j]
+if parc_str == 'schaefer' and parc_scale == 400:
+    for i, pheno in enumerate(phenos):
+        print(pheno)
+        pheno_label = phenos_label[i]
+        for j, metric in enumerate(metrics):
+            metric_label = metrics_label[j]
+            print(metric_label)
 
-        # Get coefficients and p-vals for phenotype effects
-        coef = df_pheno_z.loc[pheno].filter(regex = metric, axis = 0)['coef'].values
-        p_vals = df_pheno_z.loc[pheno].filter(regex = metric, axis = 0)['p_perm_fdr'].values # only plot significant coefficients
-        sig = df_pheno_z.loc[pheno].filter(regex = metric, axis = 0)['sig_age_smse'].values
-        p_vals[~sig] = 1
-    
-        # Summarise phenotype effects over systems
-        # present mean effect in system
-        sys_summary = get_sys_summary(coef, p_vals, yeo_idx, method = 'mean', alpha = alpha, signed = False)
-        f, ax = prop_bar_plot(sys_summary, np.ones(sys_summary.shape), labels = yeo_labels, which_colors = 'yeo17', axlim = 0.1, title_str = pheno_label + ': \n $\\rho$', fig_size = [1.75,2.25])
-        f.savefig('corr_bar_' + pheno + '_' + metric + '_z.svg', dpi = 300, bbox_inches = 'tight', pad_inches = 0)
+            # Get coefficients and p-vals for phenotype effects
+            coef = df_pheno_z.loc[pheno].filter(regex = metric, axis = 0)['coef'].values
+            p_vals = np.zeros(coef.shape,)
+            sig = df_pheno_z.loc[pheno].filter(regex = metric, axis = 0)['sig_smse'].values; p_vals[~sig] = 1  # only plot significant coefficients
+            sys_prop = get_sys_prop(coef, p_vals, yeo_idx, alpha = alpha)
+
+            if pheno == 'AnxiousMisery': my_axlim = [-0.01,0.1]
+            elif metric == 'ct': my_axlim = [-0.325,0.01]
+            else: my_axlim = [-0.8,0.1]
+
+            if pheno == 'Overall_Psychopathology' or pheno == 'AnxiousMisery': my_labels = yeo_labels
+            elif metric == 'ct' and pheno == 'Externalizing': my_labels = yeo_labels
+            else: my_labels = ''
+
+            f, ax = prop_bar_plot(sys_prop, np.ones(sys_prop.shape), labels = my_labels, which_colors = 'yeo17', axlim = my_axlim, title_str = '', fig_size = [1.75,2.5])
+            f.savefig('corr_bar_' + pheno + '_' + metric + '_z.svg', dpi = 300, bbox_inches = 'tight', pad_inches = 0)
 
 
-# ## Brain plots nispat
-
-# In[51]:
+# In[33]:
 
 
 import matplotlib.image as mpimg
 from brain_plot_func import roi_to_vtx, brain_plot
 
 
-# In[52]:
+# In[34]:
 
 
-subject_id = 'fsaverage'
+if parc_str == 'schaefer':
+    subject_id = 'fsaverage'
+elif parc_str == 'lausanne':
+    subject_id = 'lausanne125'
 
 
-# In[53]:
+# In[35]:
 
 
 get_ipython().run_line_magic('pylab', 'qt')
 
 
-# ## Brain plots nispat
+# ## Brain plots
 
-# In[54]:
+# In[36]:
+
+
+for metric in metrics:
+    for hemi in ('lh', 'rh'):
+        print(metric)
+        # Plots of univariate pheno correlation
+        fig_str = hemi + '_' + metric + '_region_filter'
+        roi_data = region_filter.filter(regex = metric, axis = 0).astype(float).values
+        roi_data[roi_data == 1] = -1000
+        roi_data[roi_data == 0] = 1
+
+        if subject_id == 'lausanne125':
+            parc_file = os.path.join('/Applications/freesurfer/subjects/', subject_id, 'label', hemi + '.myaparc_' + str(parc_scale) + '.annot')
+        elif subject_id == 'fsaverage':
+            parc_file = os.path.join('/Users/lindenmp/Dropbox/Work/ResProjects/NormativeNeuroDev_CrossSec_T1/figs_support/Parcellations/FreeSurfer5.3/fsaverage/label/',
+                                     hemi + '.Schaefer2018_' + str(parc_scale) + 'Parcels_17Networks_order.annot')
+
+        # project subject's data to vertices
+        brain_plot(roi_data, parcel_names, parc_file, fig_str, subject_id = subject_id, hemi = hemi, surf = 'inflated', center_anchor = 1, color = 'hot')
+
+
+# In[37]:
 
 
 for pheno in phenos:
@@ -686,48 +421,54 @@ for pheno in phenos:
             # Plots of univariate pheno correlation
             fig_str = hemi + '_' + pheno + '_' + metric + '_z'
             roi_data = df_pheno_z.loc[pheno].filter(regex = metric, axis = 0)['coef'].values
-            sig = df_pheno_z.loc[pheno].filter(regex = metric, axis = 0)['sig_age_smse']
-
+            sig = df_pheno_z.loc[pheno].filter(regex = metric, axis = 0)['sig_smse']
             roi_data[~sig] = -1000
 
-            if any(sig):
-                parc_file = os.path.join('/Users/lindenmp/Dropbox/Work/ResProjects/NormativeNeuroDev_CrossSec/figs_support/Parcellations/FreeSurfer5.3/fsaverage/label/',
-                                             hemi + '.Schaefer2018_' + str(parc_scale) + 'Parcels_17Networks_order.annot')
-                # project subject's data to vertices
-                brain_plot(roi_data, parcel_names, parc_file, fig_str, subject_id = subject_id, hemi = hemi)
-            else:
-                print('Nothing significant')
+            if subject_id == 'lausanne125':
+                parc_file = os.path.join('/Applications/freesurfer/subjects/', subject_id, 'label', hemi + '.myaparc_' + str(parc_scale) + '.annot')
+            elif subject_id == 'fsaverage':
+                parc_file = os.path.join('/Users/lindenmp/Dropbox/Work/ResProjects/NormativeNeuroDev_CrossSec_T1/figs_support/Parcellations/FreeSurfer5.3/fsaverage/label/',
+                                         hemi + '.Schaefer2018_' + str(parc_scale) + 'Parcels_17Networks_order.annot')
+
+            # project subject's data to vertices
+            brain_plot(roi_data, parcel_names, parc_file, fig_str, subject_id = subject_id, hemi = hemi, surf = 'inflated', center_anchor = 0.2)
 
 
-# In[55]:
+# In[38]:
 
 
 get_ipython().run_line_magic('matplotlib', 'inline')
 
 
-# Figure 4A
+# # Figure 3
 
-# In[56]:
+# In[39]:
 
 
 for pheno in phenos:
     for metric in metrics:
-        f, axes = plt.subplots(2, 2)
-        f.set_figwidth(4)
-        f.set_figheight(4)
-        plt.subplots_adjust(wspace=0, hspace=0)
+        f, axes = plt.subplots(3, 2)
+        f.set_figwidth(3)
+        f.set_figheight(5)
+        plt.subplots_adjust(wspace=0, hspace=-0.465)
 
         print(pheno)
         print(metric)
         # column 0:
         fig_str = 'lh_'+pheno+'_'+metric+'_z.png'
         try:
-        #     axes[0,0].set_title('Thickness (left)')
-            image = mpimg.imread('lat_' + fig_str); axes[0,0].imshow(image); axes[0,0].axis('off')
-        except FileNotFoundError: axes[0,0].axis('off')
+            image = mpimg.imread('ventral_' + fig_str); axes[2,0].imshow(image); axes[2,0].axis('off')
+        except FileNotFoundError: axes[2,0].axis('off')
         try:
             image = mpimg.imread('med_' + fig_str); axes[1,0].imshow(image); axes[1,0].axis('off')
         except FileNotFoundError: axes[1,0].axis('off')
+        try:
+        #     axes[0,0].set_title('Thickness (left)')
+            image = mpimg.imread('lat_' + fig_str); axes[0,0].imshow(image); axes[0,0].axis('off')
+        except FileNotFoundError: axes[0,0].axis('off')
+
+
+            
 
         # column 1:
         fig_str = 'rh_'+pheno+'_'+metric+'_z.png'
@@ -738,8 +479,43 @@ for pheno in phenos:
         try:
             image = mpimg.imread('med_' + fig_str); axes[1,1].imshow(image); axes[1,1].axis('off')
         except FileNotFoundError: axes[1,1].axis('off')
+        try:
+            image = mpimg.imread('ventral_' + fig_str); axes[2,1].imshow(image); axes[2,1].axis('off')
+        except FileNotFoundError: axes[2,1].axis('off')
 
         plt.show()
-        # f.savefig(metric+'_'+pheno+'_z.png', dpi = 300, bbox_inches = 'tight', pad_inches = 0)
-        f.savefig(metric+'_'+pheno+'_z.svg', dpi = 1200, bbox_inches = 'tight', pad_inches = 0)
+#         f.savefig(metric+'_'+pheno+'_z.png', dpi = 300, bbox_inches = 'tight', pad_inches = 0)
+        f.savefig(metric+'_'+pheno+'_z.svg', dpi = 1000, bbox_inches = 'tight', pad_inches = 0)
+
+
+# In[40]:
+
+
+for metric in metrics:
+    f, axes = plt.subplots(2, 2)
+    f.set_figwidth(3)
+    f.set_figheight(3)
+    plt.subplots_adjust(wspace=0, hspace=0)
+
+    print(metric)
+    # column 0:
+    fig_str = 'lh_'+metric+'_region_filter.png'
+    try:
+        image = mpimg.imread('lat_' + fig_str); axes[0,0].imshow(image); axes[0,0].axis('off')
+    except FileNotFoundError: axes[0,0].axis('off')
+    try:
+        image = mpimg.imread('med_' + fig_str); axes[1,0].imshow(image); axes[1,0].axis('off')
+    except FileNotFoundError: axes[1,0].axis('off')
+
+    # column 1:
+    fig_str = 'rh_'+metric+'_region_filter.png'
+    try:
+        image = mpimg.imread('lat_' + fig_str); axes[0,1].imshow(image); axes[0,1].axis('off')
+    except FileNotFoundError: axes[0,1].axis('off')
+    try:
+        image = mpimg.imread('med_' + fig_str); axes[1,1].imshow(image); axes[1,1].axis('off')
+    except FileNotFoundError: axes[1,1].axis('off')
+
+    plt.show()
+    f.savefig(metric+'_region_filter.svg', dpi = 1000, bbox_inches = 'tight', pad_inches = 0)
 
