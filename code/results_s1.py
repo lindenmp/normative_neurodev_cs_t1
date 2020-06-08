@@ -6,14 +6,22 @@
 # In[1]:
 
 
-import os, sys
+# Essentials
+import os, sys, glob
 import pandas as pd
 import numpy as np
+import nibabel as nib
+
+# Stats
 import scipy as sp
 from scipy import stats
+import statsmodels.api as sm
+import pingouin as pg
+
+# Plotting
 import seaborn as sns
 import matplotlib.pyplot as plt
-import statsmodels.api as sm
+plt.rcParams['svg.fonttype'] = 'none'
 
 
 # In[2]:
@@ -21,7 +29,8 @@ import statsmodels.api as sm
 
 sys.path.append('/Users/lindenmp/Dropbox/Work/ResProjects/NormativeNeuroDev_CrossSec_T1/code/func/')
 from proj_environment import set_proj_env
-from func import run_corr, get_fdr_p, get_cmap
+sys.path.append('/Users/lindenmp/Dropbox/Work/git/pyfunc/')
+from func import run_corr, get_fdr_p, my_get_cmap
 
 
 # In[3]:
@@ -29,8 +38,8 @@ from func import run_corr, get_fdr_p, get_cmap
 
 train_test_str = 'squeakycleanExclude' # 'squeakycleanExclude' 'trte_psychopathology'
 exclude_str = 't1Exclude' # 't1Exclude' 'fsFinalExclude'
-parc_str = 'schaefer'
-parc_scale = 400 # 125 400
+parc_str = 'schaefer' # 'schaefer' 'lausanne'
+parc_scale = 400 # 200 400 | 60 125
 primary_covariate = 'ageAtScan1_Years'
 extra_str = ''
 parcel_names, parcel_loc, drop_parcels, num_parcels, yeo_idx, yeo_labels = set_proj_env(train_test_str = train_test_str, exclude_str = exclude_str,
@@ -50,55 +59,37 @@ os.environ['MODELDIR']
 
 # Train
 df_train = pd.read_csv(os.path.join(os.environ['NORMATIVEDIR'], 'train.csv'))
-df_train.set_index(['bblid', 'scanid'], inplace = True); print(df_train.shape)
+df_train.set_index(['bblid', 'scanid'], inplace = True)
 df_node_train = pd.read_csv(os.path.join(os.environ['NORMATIVEDIR'], 'resp_train.csv'))
 df_node_train.set_index(['bblid', 'scanid'], inplace = True)
 
 # Test
 df_test = pd.read_csv(os.path.join(os.environ['NORMATIVEDIR'], 'test.csv'))
-df_test.set_index(['bblid', 'scanid'], inplace = True); print(df_test.shape)
+df_test.set_index(['bblid', 'scanid'], inplace = True)
 df_node_test = pd.read_csv(os.path.join(os.environ['NORMATIVEDIR'], 'resp_test.csv'))
 df_node_test.set_index(['bblid', 'scanid'], inplace = True)
 
 # concat
-df = pd.concat([df_train, df_test])
-df_node = pd.concat([df_node_train, df_node_test])
+df = pd.concat((df_train, df_test), axis = 0); print(df.shape)
+df_node = pd.concat((df_node_train, df_node_test), axis = 0); print(df_node.shape)
 
-
-# ## Age effects
 
 # In[6]:
 
 
-# regress out sex
-df_nuis = df_train.loc[:,'sex_adj']
-df_nuis = sm.add_constant(df_nuis)
-
-cols = df_node_train.columns
-mdl = sm.OLS(df_node_train.loc[:,cols].astype(float), df_nuis.astype(float)).fit()
-y_pred = mdl.predict(df_nuis)
-y_pred.columns = cols
-df_node_train.loc[:,cols] = df_node_train.loc[:,cols] - y_pred
+smse = np.loadtxt(os.path.join(os.environ['NORMATIVEDIR'], 'smse.txt'), delimiter = ' ').transpose()
+df_smse = pd.DataFrame(data = smse, index = df_node.columns)
 
 
 # In[7]:
 
 
-# age effect on training set
-df_age_effect = run_corr(df_train[primary_covariate], df_node_train, typ = 'spearmanr'); df_age_effect['p_fdr'] = get_fdr_p(df_age_effect['p'])
-age_alpha = 0.05
-age_filter = df_age_effect['p_fdr'].values < age_alpha
-
-
-# In[8]:
-
-
-age_filter.sum()
+smse_thresh = 1
 
 
 # ## Load nispat outputs
 
-# In[9]:
+# In[8]:
 
 
 # Forward model
@@ -112,28 +103,7 @@ ys2_forward = np.loadtxt(os.path.join(os.environ['NORMATIVEDIR'], 'forward/ys2.t
 df_ys2_forward = pd.DataFrame(data = ys2_forward, index = synth_cov_test.index, columns = df_node.columns)
 
 
-# In[10]:
-
-
-smse = np.loadtxt(os.path.join(os.environ['NORMATIVEDIR'], 'smse.txt'), delimiter = ' ').transpose()
-df_smse = pd.DataFrame(data = smse, index = df_node.columns)
-
-
-# In[11]:
-
-
-smse_thresh = 1
-smse_filter = df_smse.values < smse_thresh
-smse_filter = smse_filter.reshape(-1)
-
-
-# In[12]:
-
-
-smse_filter.sum()
-
-
-# In[13]:
+# In[9]:
 
 
 df_yhat_forward_tmp = df_yhat_forward + (df_yhat_forward.abs().max()+1)
@@ -158,46 +128,68 @@ df_yhat_diff = pd.concat((df_yhat_tmp1, df_yhat_tmp2), axis = 1)
 df_yhat_diff.head()
 
 
+# In[10]:
+
+
+df_yhat_diff.filter(regex = 'ct', axis = 0).abs().max()
+
+
+# In[11]:
+
+
+df_yhat_diff.filter(regex = 'vol', axis = 0).abs().max()
+
+
 # # Plots
 
-# In[14]:
+# In[12]:
 
 
 if not os.path.exists(os.environ['FIGDIR']): os.makedirs(os.environ['FIGDIR'])
 os.chdir(os.environ['FIGDIR'])
 sns.set(style='white', context = 'paper', font_scale = 1)
-cmap = get_cmap('pair')
+cmap = my_get_cmap('pair')
 
-metrics = ('ct', 'vol')
-metrics_label_short = ('Thickness', 'Volume')
-metrics_label = ('Thickness', 'Volume')
+metrics = ['ct', 'vol']
+metrics_label_short = ['Thickness', 'Volume']
+metrics_label = ['Thickness', 'Volume']
 print(metrics)
 
 
 # ## Brain plots nispat
 
-# In[15]:
+# In[13]:
 
 
 import matplotlib.image as mpimg
 from brain_plot_func import roi_to_vtx, brain_plot
 
 
-# In[16]:
+# In[14]:
 
 
-subject_id = 'fsaverage'
+if parc_str == 'schaefer':
+    subject_id = 'fsaverage'
+elif parc_str == 'lausanne':
+    subject_id = 'lausanne125'
 
 
-# In[17]:
+# In[15]:
 
 
 get_ipython().run_line_magic('pylab', 'qt')
 
 
+# In[16]:
+
+
+import mayavi as my
+import surfer
+
+
 # 0 = Male, 1 = Female
 
-# In[18]:
+# In[17]:
 
 
 for metric in metrics:
@@ -209,20 +201,20 @@ for metric in metrics:
                 roi_data = df_yhat_diff.loc[:,0].filter(regex = metric, axis = 0).values
             elif sx == 'sex1':
                 roi_data = df_yhat_diff.loc[:,1].filter(regex = metric, axis = 0).values
-            age_filt = df_age_effect.filter(regex = metric, axis = 0)['p_fdr'].values < age_alpha
-            smse_filt = df_smse.filter(regex = metric, axis = 0).values < smse_thresh
-            smse_filt = smse_filt.reshape(-1)
-            region_filt = np.logical_and(age_filt,smse_filt)
+            region_filt = df_smse.filter(regex = metric, axis = 0).loc[:,0] < smse_thresh
 
             roi_data[~region_filt] = -1000
             if metric == 'ct':
-                center_anchor = 3
+                center_anchor = 1
             elif metric == 'vol':
-                center_anchor = 5
+                center_anchor = 1
 
             if region_filt.any():
-                parc_file = os.path.join('/Users/lindenmp/Dropbox/Work/ResProjects/NeuroDev_NetworkControl/figs/Parcellations/FreeSurfer5.3/fsaverage/label/',
-                                         hemi + '.Schaefer2018_' + str(parc_scale) + 'Parcels_17Networks_order.annot')
+                if subject_id == 'lausanne125':
+                    parc_file = os.path.join('/Applications/freesurfer/subjects/', subject_id, 'label', hemi + '.myaparc_' + str(parc_scale) + '.annot')
+                elif subject_id == 'fsaverage':
+                    parc_file = os.path.join('/Users/lindenmp/Dropbox/Work/ResProjects/NormativeNeuroDev_CrossSec_T1/figs_support/Parcellations/FreeSurfer5.3/fsaverage/label/',
+                                             hemi + '.Schaefer2018_' + str(parc_scale) + 'Parcels_17Networks_order.annot')
 
                 brain_plot(roi_data, parcel_names, parc_file, fig_str, subject_id = subject_id, hemi = hemi, color = 'coolwarm', center_anchor = center_anchor)
             else:
@@ -231,13 +223,25 @@ for metric in metrics:
 
 # # Figures
 
-# In[19]:
+# In[18]:
 
 
 get_ipython().run_line_magic('matplotlib', 'inline')
 
 
-# Figure 2C (top)
+# In[19]:
+
+
+f, ax = plt.subplots(1)
+f.set_figwidth(1)
+f.set_figheight(1)
+
+limit = 3
+sns.heatmap(np.zeros((1,1)), annot = False, xticklabels = [""], yticklabels = [""], center = 0, vmax = limit, vmin = -limit, ax = ax, square = True, cmap = 'coolwarm', cbar_kws={"orientation": "horizontal"})
+f.savefig('colorbar_'+str(limit)+'.svg', dpi = 300, bbox_inches = 'tight', pad_inches = 0)
+
+
+# Figure 2C
 
 # In[20]:
 
@@ -253,7 +257,6 @@ for my_str in ('_sex0_frwd', '_sex1_frwd'):
     # column 0:
     fig_str = 'lh_ct_age'+my_str+'.png'
     try:
-#         axes[0,0].set_title('Thickness (L)', fontsize = 8)
         image = mpimg.imread('lat_' + fig_str); axes[0,0].imshow(image); axes[0,0].axis('off')
     except FileNotFoundError: axes[0,0].axis('off')
     try:
@@ -263,7 +266,6 @@ for my_str in ('_sex0_frwd', '_sex1_frwd'):
     # column 1:
     fig_str = 'rh_ct_age'+my_str+'.png'
     try:
-#         axes[0,1].set_title('Thickness (R)', fontsize = 8)
         image = mpimg.imread('lat_' + fig_str); axes[0,1].imshow(image); axes[0,1].axis('off')
     except FileNotFoundError: axes[0,1].axis('off')
     try:
@@ -273,7 +275,6 @@ for my_str in ('_sex0_frwd', '_sex1_frwd'):
     # column 2:
     fig_str = 'lh_vol_age'+my_str+'.png'
     try:
-#         axes[0,2].set_title('Jacobian (L)', fontsize = 8)
         image = mpimg.imread('lat_' + fig_str); axes[0,2].imshow(image); axes[0,2].axis('off')
     except FileNotFoundError: axes[0,2].axis('off')
     try:
@@ -283,7 +284,6 @@ for my_str in ('_sex0_frwd', '_sex1_frwd'):
     # column 3:
     fig_str = 'rh_vol_age'+my_str+'.png'
     try:
-#         axes[0,3].set_title('Jacobian (R)', fontsize = 8)
         image = mpimg.imread('lat_' + fig_str); axes[0,3].imshow(image); axes[0,3].axis('off')
     except FileNotFoundError: axes[0,3].axis('off')
     try:
@@ -291,6 +291,6 @@ for my_str in ('_sex0_frwd', '_sex1_frwd'):
     except FileNotFoundError: axes[1,3].axis('off')
 
     plt.show()
-    f.savefig('brain_age'+my_str+'.svg', dpi = 1200, bbox_inches = 'tight', pad_inches = 0)
-    f.savefig('brain_age'+my_str+'.png', dpi = 300, bbox_inches = 'tight', pad_inches = 0)
+    f.savefig('brain_age'+my_str+'.svg', dpi = 1000, bbox_inches = 'tight', pad_inches = 0)
+#     f.savefig('brain_age'+my_str+'.png', dpi = 300, bbox_inches = 'tight', pad_inches = 0)
 
