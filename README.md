@@ -12,6 +12,7 @@ This repository includes code used to analyze the relationship between dimension
 	pip install statsmodels sklearn pingouin
 	# Extras
 	pip install nibabel torch glob3
+	
 	# Pysurfer for plotting
 	pip install mayavi
 	pip install PyQt5
@@ -34,21 +35,19 @@ In the **code** subdirectory you will find the following Jupyter notebooks and .
 - `compute_node_metrics.ipynb`
 	- Reads in neuroimaging data.
 	- Sets up feature table of regional brain features.
-- `clean_node_metrics.ipynb`
-	- Performs nuisance regression on feature table.
 - `prepare_normative.ipynb`
 	- Prepares input files for normative modeling.
 
 2. Run normative modeling:
-- `run_normative_local.py`
-	- Runs primary normative models on local machine.
-- `cluster/run_normative_perm.sh`
-	- Submits each of the permuted normative models to the cluster as a separate job
+- `cluster/run_normative_cbia.py`
+	- Submits normative models to the cbica cluster
 
 3. Results:
 - `results_s1.ipynb`
 	- Produces Figure 2C
-- `results_s2.ipynb`
+- `results_s2_phenos.ipynb`
 	- Produces Figures 3 and 4
-- `results_s3.ipynb`
+- `results_s3_case_control.ipynb`
 	- Produces Figure 5
+- `results_s4_nm_vs_nonnm.ipynb`
+	- Produces Table S1
