@@ -154,13 +154,13 @@ sp.stats.ttest_ind(df.loc[group_idx[:,0],primary_covariate], df.loc[group_idx[:,
 # get pheno correlations without subjects in the diagnostic groups
 # note, these correlations are generated prior to regressing out age/sex below to keep them in line with what was done in the primary analyses (results_s2_phenos)
 # note, in the primary analyses i found that controlling for age/sex in the z scores made no difference to the results which is why it's not included
-df_pheno_z_woutgroups = run_pheno_correlations(df.loc[group_idx.sum(axis = 1) == 0,phenos], df_z.loc[group_idx.sum(axis = 1) == 0,:], method = method, assign_p = 'parametric')
+# df_pheno_z_woutgroups = run_pheno_correlations(df.loc[group_idx.sum(axis = 1) == 0,phenos], df_z.loc[group_idx.sum(axis = 1) == 0,:], method = method, assign_p = 'parametric')
 
 
 # In[17]:
 
 
-df_pheno_z_woutgroups.head()
+# df_pheno_z_woutgroups.head()
 
 
 # ### Regress age/sex out of node features
@@ -177,7 +177,7 @@ cols = df_z.columns
 mdl = sm.OLS(df_z.loc[:,cols], df_nuis).fit()
 y_pred = mdl.predict(df_nuis)
 y_pred.columns = cols
-df_z.loc[:,cols] = df_z.loc[:,cols] - y_pred
+df_z_regr = df_z.loc[:,cols] - y_pred
 
 
 # ## Disorder groups vs. HCs
@@ -188,8 +188,8 @@ df_z.loc[:,cols] = df_z.loc[:,cols] - y_pred
 for i, group in enumerate(groups):
     i_idx = group_idx[:,i]
     for metric in metrics:
-        df_y = df_z.loc[df[train_test_str] == 0,region_filter].filter(regex = metric, axis = 1)
-        df_x = df_z.loc[i_idx,region_filter].filter(regex = metric, axis = 1)
+        df_y = df_z_regr.loc[df[train_test_str] == 0,region_filter].filter(regex = metric, axis = 1)
+        df_x = df_z_regr.loc[i_idx,region_filter].filter(regex = metric, axis = 1)
         df_out = run_ttest(df_x, df_y, tail = 'one')
         print(group+'_'+metric + ', significant t-tests:', (np.sum(df_out.loc[:,'p-corr'] < .05) / df_out.shape[0] * 100))
 
@@ -205,11 +205,10 @@ metric = metrics[1]; print(metric)
 # In[21]:
 
 
-df_y = df_z.loc[df[train_test_str] == 0,:].filter(regex = metric, axis = 1)
+df_y = df_z_regr.loc[df[train_test_str] == 0,:].filter(regex = metric, axis = 1)
 
-X = get_cohend(df_z.loc[group_idx[:,0],:].filter(regex = metric, axis = 1), df_y).loc[:,'d'].rename('Depression')
-y = get_cohend(df_z.loc[group_idx[:,1],:].filter(regex = metric, axis = 1), df_y).loc[:,'d'].rename('ADHD')
-# df_input = pd.concat((df_pheno_z_woutgroups.loc[pheno,'coef'].filter(regex = metric).astype(float), X, y), axis = 1)
+X = get_cohend(df_z_regr.loc[group_idx[:,0],:].filter(regex = metric, axis = 1), df_y).loc[:,'d'].rename('Depression')
+y = get_cohend(df_z_regr.loc[group_idx[:,1],:].filter(regex = metric, axis = 1), df_y).loc[:,'d'].rename('ADHD')
 df_input = pd.concat((X, y), axis = 1)
 
 df_input.head()
