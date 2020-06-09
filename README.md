@@ -58,3 +58,7 @@ In the **code** subdirectory you will find the following Jupyter notebooks and .
 	- Computes regional correlations between psychopathology dimensions and brain features, bypassing the normative model
 	- Loads in results from `results_s2_phenos.ipynb` and performs regional Steiger's tests to compare analyses
 	- Produces Table S1
+
+# Dependencies
+
+This code depends upon https://github.com/lindenmp/pyfunc
