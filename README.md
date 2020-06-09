@@ -44,10 +44,17 @@ In the **code** subdirectory you will find the following Jupyter notebooks and .
 
 3. Results:
 - `results_s1.ipynb`
+	- Plots predictions from the normative model as annualized percent change.
 	- Produces Figure 2C
 - `results_s2_phenos.ipynb`
+	- Computes regional correlations between psychopathology dimensions and deviations from the normative model
 	- Produces Figures 3 and 4
 - `results_s3_case_control.ipynb`
+	- Computes regional Cohen's D comparing deviations from depression and ADHD groups against healthy controls
+	- Computes spatial correlation of Cohen's D values between depression and ADHD groups
+	- Repeats above analyses controlling for overall psychopathology
 	- Produces Figure 5
 - `results_s4_nm_vs_nonnm.ipynb`
+	- Computes regional correlations between psychopathology dimensions and brain features, bypassing the normative model
+	- Loads in results from `results_s2_phenos.ipynb` and performs regional Steiger's tests to compare analyses
 	- Produces Table S1
