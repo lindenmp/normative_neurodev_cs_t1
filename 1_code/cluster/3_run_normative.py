@@ -119,9 +119,14 @@ execute_nm(workdir,
 # ------------------------------------------------------------------------------
 # NOTE: only run *after* cluster jobs are done
 workdir = os.path.join(outputdir,file_prefix+'out/')
-workdir = os.path.join(outputdir,file_prefix+'out_forward/')
-workdir = os.path.join(outputdir,file_prefix+'out_cv/')
+collect_nm(workdir, collect=True)
+delete_nm(workdir)
 
+workdir = os.path.join(outputdir,file_prefix+'out_forward/')
+collect_nm(workdir, collect=True)
+delete_nm(workdir)
+
+workdir = os.path.join(outputdir,file_prefix+'out_cv/')
 collect_nm(workdir, collect=True)
 delete_nm(workdir)
 
