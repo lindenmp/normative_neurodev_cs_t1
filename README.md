@@ -33,37 +33,38 @@ This repository includes code used to analyze the relationship between dimension
 
 In the **code** subdirectory you will find the following Jupyter notebooks and .py scripts:
 1. Pre-normative modeling scripts:
-- `get_train_test.ipynb`
+- `0_get_sample.ipynb`
 	- Performs initial ingest of PNC demographic data, participant exclusion based on various quality control.
 	- Produces Figures 2A and 2B.
 	- Designates train/test split.
-- `compute_node_metrics.ipynb`
+- `1_compute_node_metrics.ipynb`
 	- Reads in neuroimaging data.
 	- Sets up feature table of regional brain features.
-- `prepare_normative.ipynb`
+- `2_prepare_normative.ipynb`
 	- Prepares input files for normative modeling.
 
 2. Run normative modeling:
-- `cluster/run_normative_cbia.py`
+- `cluster/3_run_normative.py`
 	- Submits normative models to the cbica cluster
 
 3. Results:
-- `results_s1.ipynb`
+- `4_results_sample_characteristics.ipynb`
+- `5_results_forward.ipynb`
 	- Plots predictions from the normative model as annualized percent change.
 	- Produces Figure 2C
-- `results_s2_phenos.ipynb`
+- `6_results_correlations.ipynb`
 	- Computes regional correlations between psychopathology dimensions and deviations from the normative model
 	- Produces Figures 3 and 4
-- `results_s3_case_control.ipynb`
+- `7_results_case_control.ipynb`
 	- Computes regional Cohen's D comparing deviations from depression and ADHD groups against healthy controls
 	- Computes spatial correlation of Cohen's D values between depression and ADHD groups
 	- Repeats above analyses controlling for overall psychopathology
 	- Produces Figure 5
-- `results_s4_nm_vs_nonnm.ipynb`
+<!-- - `results_s4_nm_vs_nonnm.ipynb`
 	- Computes regional correlations between psychopathology dimensions and brain features, bypassing the normative model
 	- Loads in results from `results_s2_phenos.ipynb` and performs regional Steiger's tests to compare analyses
-	- Produces Table S1
+	- Produces Table S1 -->
 
-# Dependencies
+<!-- # Dependencies
 
-This code depends upon https://github.com/lindenmp/pyfunc
+This code depends upon https://github.com/lindenmp/pyfunc -->
