@@ -13,6 +13,9 @@ This repository includes code used to analyze the relationship between dimension
 	# Statistics
 	pip install scipy statsmodels sklearn pingouin pygam brainspace bctpy
 
+	# Extra
+	pip install mat73
+
 	# Pysurfer for plotting
 	pip install vtk==8.1.2
 	pip install mayavi
