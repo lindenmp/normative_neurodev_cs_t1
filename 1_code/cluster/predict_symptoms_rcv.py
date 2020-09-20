@@ -98,7 +98,7 @@ def get_cv(y, n_splits = 10):
     return my_cv
 
 
-def cross_val_score_nuis(X, y, my_cv, reg, my_scorer):
+def my_cross_val_score(X, y, my_cv, reg, my_scorer):
     
     accuracy = np.zeros(len(my_cv),)
     y_pred_out = np.zeros(y.shape)
@@ -129,7 +129,7 @@ def run_reg(X, y, reg, my_scorer, n_splits = 10, seed = 0):
 
     my_cv = get_cv(y_shuf, n_splits = n_splits)
 
-    accuracy, y_pred_out = cross_val_score_nuis(X = X_shuf, y = y_shuf, my_cv = my_cv, reg = reg, my_scorer = my_scorer)
+    accuracy, y_pred_out = my_cross_val_score(X = X_shuf, y = y_shuf, my_cv = my_cv, reg = reg, my_scorer = my_scorer)
 
     return accuracy, y_pred_out
 

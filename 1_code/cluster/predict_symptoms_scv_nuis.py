@@ -105,7 +105,7 @@ def get_stratified_cv(X, y, c = None, n_splits = 10):
         return X_sort, y_sort, my_cv
 
 
-def cross_val_score_nuis(X, y, c, my_cv, reg, my_scorer, c_y = None):
+def my_cross_val_score(X, y, c, my_cv, reg, my_scorer, c_y = None):
     
     accuracy = np.zeros(len(my_cv),)
 
@@ -163,14 +163,14 @@ def run_reg_scv(X, y, c, reg, n_splits = 10, scoring = 'r2', run_perm = False):
     
     X_sort, y_sort, my_cv, c_sort = get_stratified_cv(X = X, y = y, c = c, n_splits = n_splits)
 
-    accuracy_nuis = cross_val_score_nuis(X = X_sort, y = y_sort, c = c_sort, my_cv = my_cv, reg = reg, my_scorer = scoring)
+    accuracy = my_cross_val_score(X = X_sort, y = y_sort, c = c_sort, my_cv = my_cv, reg = reg, my_scorer = scoring)
 
     if run_perm:
         X_sort.reset_index(drop = True, inplace = True)
         c_sort.reset_index(drop = True, inplace = True)
 
         n_perm = 5000
-        permuted_acc_nuis = np.zeros((n_perm,))
+        permuted_acc = np.zeros((n_perm,))
 
         for i in np.arange(n_perm):
             np.random.seed(i)
@@ -182,12 +182,12 @@ def run_reg_scv(X, y, c, reg, n_splits = 10, scoring = 'r2', run_perm = False):
             c_y = c_sort.iloc[idx,:]
             c_y.reset_index(drop = True, inplace = True)
             
-            permuted_acc_nuis[i] = cross_val_score_nuis(X = X_sort, y = y_perm, c = c_sort, my_cv = my_cv, reg = reg, my_scorer = scoring, c_y = c_y).mean()
+            permuted_acc[i] = my_cross_val_score(X = X_sort, y = y_perm, c = c_sort, my_cv = my_cv, reg = reg, my_scorer = scoring, c_y = c_y).mean()
 
     if run_perm:
-        return accuracy_nuis, permuted_acc_nuis
+        return accuracy, permuted_acc
     else:
-        return accuracy_nuis
+        return accuracy
 
 
 # --------------------------------------------------------------------------------------------------------------------
@@ -226,15 +226,15 @@ elif score == 'mae':
 # prediction
 regs = get_reg()
 
-accuracy_nuis, permuted_acc_nuis = run_reg_scv(X = X, y = y, c = c, reg = regs[alg], scoring = my_scorer, run_perm = True)
+accuracy, permuted_acc = run_reg_scv(X = X, y = y, c = c, reg = regs[alg], scoring = my_scorer, run_perm = True)
 # --------------------------------------------------------------------------------------------------------------------
 
 # --------------------------------------------------------------------------------------------------------------------
 # outputs
-np.savetxt(os.path.join(outdir,'accuracy_nuis.txt'), accuracy_nuis)
-np.savetxt(os.path.join(outdir,'accuracy_mean_nuis.txt'), np.array([accuracy_nuis.mean()]))
-np.savetxt(os.path.join(outdir,'accuracy_std_nuis.txt'), np.array([accuracy_nuis.std()]))
-np.savetxt(os.path.join(outdir,'permuted_acc_nuis.txt'), permuted_acc_nuis)
+np.savetxt(os.path.join(outdir,'accuracy.txt'), accuracy)
+np.savetxt(os.path.join(outdir,'accuracy_mean.txt'), np.array([accuracy.mean()]))
+np.savetxt(os.path.join(outdir,'accuracy_std.txt'), np.array([accuracy.std()]))
+np.savetxt(os.path.join(outdir,'permuted_acc.txt'), permuted_acc)
 
 # --------------------------------------------------------------------------------------------------------------------
 
