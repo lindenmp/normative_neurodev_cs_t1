@@ -39,13 +39,11 @@ from func import set_proj_env, get_synth_cov
 # In[4]:
 
 
-train_test_str = 'squeakycleanExclude'
+train_test_str = 'train_test'
 exclude_str = 't1Exclude' # 't1Exclude' 'fsFinalExclude'
 parc_str = 'schaefer' # 'schaefer' 'lausanne'
 parc_scale = 400 # 200 400 | 60 125 250
-extra_str = ''
-parcel_names, parcel_loc, drop_parcels, num_parcels, yeo_idx, yeo_labels = set_proj_env(train_test_str = train_test_str, exclude_str = exclude_str,
-                                                                                        parc_str = parc_str, parc_scale = parc_scale)
+parcel_names, parcel_loc, drop_parcels, num_parcels, yeo_idx, yeo_labels = set_proj_env(exclude_str = exclude_str, parc_str = parc_str, parc_scale = parc_scale)
 
 
 # In[5]:
@@ -177,7 +175,7 @@ df[df[train_test_str] == 1].to_csv(os.path.join(outputdir, outfile_prefix+'test.
 df[df[train_test_str] == 1].to_csv(os.path.join(outputdir, outfile_prefix+'cov_test.txt'), columns = covs, sep = ' ', index = False, header = False)
 
 
-# In[17]:
+# In[ ]:
 
 
 # Write out training
@@ -199,7 +197,7 @@ print(str(resp_train.shape[1]) + ' features written out for normative modeling')
 
 # ### Forward variants
 
-# In[18]:
+# In[ ]:
 
 
 # Synthetic cov data
