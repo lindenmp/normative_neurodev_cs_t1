@@ -37,7 +37,7 @@ train_test_str = 'squeakycleanExclude'
 exclude_str = 't1Exclude' # 't1Exclude' 'fsFinalExclude'
 parc_str = 'schaefer' # 'schaefer' 'lausanne'
 parc_scale = 400 # 200 400 | 60 125 250
-_ = set_proj_env(train_test_str = train_test_str, exclude_str = exclude_str, parc_str = parc_str, parc_scale = parc_scale)
+_ = set_proj_env(exclude_str = exclude_str, parc_str = parc_str, parc_scale = parc_scale)
 
 
 # In[4]:
@@ -133,16 +133,28 @@ print('N after T1 exclusion:', df.shape[0])
 # In[11]:
 
 
-df['averageManualRating'].unique()
+# 3) filter subjects with NaN on key variables
+screen = [train_test_str, 'ageAtScan1', 'sex', 'race2', 'handednessv2', 'medu1', 'mprage_antsCT_vol_TBV', 'averageManualRating',
+          'Overall_Psychopathology','Psychosis_Positive','Psychosis_NegativeDisorg','AnxiousMisery','Externalizing','Fear']
+
+drop_idx = df.loc[:,screen].isna().any(axis = 1)
+df = df.loc[~drop_idx,:]
+print('N after variable screen:', df.shape[0])
 
 
 # In[12]:
 
 
-np.sum(df['averageManualRating'] == 2)
+df['averageManualRating'].unique()
 
 
 # In[13]:
+
+
+np.sum(df['averageManualRating'] == 2)
+
+
+# In[14]:
 
 
 # Convert age to years
@@ -151,7 +163,7 @@ df['ageAtScan1_Years'] = np.round(df.ageAtScan1/12, decimals=1)
 
 # # Define train/test split
 
-# In[14]:
+# In[15]:
 
 
 if train_test_str == 'squeakycleanExclude':
@@ -162,14 +174,22 @@ if train_test_str == 'squeakycleanExclude':
     # have studies use this without a strong rationale; would discuss with your BBL liaison."
     # train = squeakycleanExclude == 0 --> retain those WITHOUT any lifetime psychopathology 
     # test = squeakycleanExclude == 1 --> retain those WITH lifetime psychopathology
-    print('Train: ', np.sum(df[train_test_str] == 0), 'Test:', np.sum(df[train_test_str] == 1))
+    print('Train:', np.sum(df[train_test_str] == 0), 'Test:', np.sum(df[train_test_str] == 1))
+
+    # randomly sample a healthy holdout cohort
+    df['train_test'] = df[train_test_str]
+    hold_out = df.loc[df[train_test_str] == 0,:].sample(n=100, random_state=0, replace=False, axis=0).index
+    df.loc[hold_out,'train_test'] = 1
+    print('Train:', np.sum(df['train_test'] == 0), 'Test:', np.sum(df['train_test'] == 1))
+
+train_test_str = 'train_test'
 
 
 # # Characterise train/test split
 
 # ## Train/Test split
 
-# In[15]:
+# In[16]:
 
 
 # find unique ages
@@ -193,14 +213,14 @@ elif test_diff.size != 0:
 
 # ## Export
 
-# In[16]:
+# In[17]:
 
 
 phenos = ['Overall_Psychopathology','Psychosis_Positive','Psychosis_NegativeDisorg','AnxiousMisery','Externalizing','Fear']
 print(phenos)
 
 
-# In[17]:
+# In[18]:
 
 
 for pheno in phenos:
@@ -210,7 +230,7 @@ for pheno in phenos:
         df.loc[df.loc[:,pheno].isna(),pheno] = x
 
 
-# In[18]:
+# In[19]:
 
 
 # Normalize
@@ -228,16 +248,16 @@ for i, pheno in enumerate(phenos):
 print(np.sum(rank_r < 1))
 
 
-# In[19]:
+# In[20]:
 
 
 df.loc[:,phenos].var()
 
 
-# In[20]:
+# In[21]:
 
 
-header = [train_test_str, 'ageAtScan1', 'ageAtScan1_Years','sex','race2','handednessv2',
+header = ['squeakycleanExclude', 'train_test', 'ageAtScan1', 'ageAtScan1_Years','sex', 'race2', 'handednessv2', 'medu1',
           'mprage_antsCT_vol_TBV', 'averageManualRating',
           'Overall_Psychopathology','Psychosis_Positive','Psychosis_NegativeDisorg','AnxiousMisery','Externalizing','Fear',
           'goassessSmryMood', 'goassessSmryMan', 'goassessSmryDep', 'goassessSmryEat', 'goassessSmryBul',
@@ -251,7 +271,7 @@ df.to_csv(os.path.join(outputdir, outfile_prefix+'df.csv'), columns = header)
 
 # # Plots
 
-# In[21]:
+# In[22]:
 
 
 if not os.path.exists(figdir): os.makedirs(figdir)
@@ -266,7 +286,7 @@ phenos_label = ['Overall Psychopathology','Psychosis (Positive)','Psychosis (Neg
 
 # Figure 2A
 
-# In[22]:
+# In[23]:
 
 
 f, axes = plt.subplots(1,2)
@@ -304,7 +324,7 @@ f.savefig(outfile_prefix+'age_distributions.svg', dpi = 300, bbox_inches = 'tigh
 
 # Figure 2B
 
-# In[23]:
+# In[24]:
 
 
 df_rc = pd.melt(df, id_vars = train_test_str, value_vars = phenos)
