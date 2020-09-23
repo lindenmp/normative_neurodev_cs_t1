@@ -20,6 +20,7 @@ from sklearn.kernel_ridge import KernelRidge
 from sklearn.svm import SVR, LinearSVR
 from sklearn.metrics import make_scorer, r2_score, mean_squared_error, mean_absolute_error
 from sklearn.decomposition import PCA
+import copy
 
 # --------------------------------------------------------------------------------------------------------------------
 # parse input arguments
@@ -136,21 +137,19 @@ def my_cross_val_score(X, y, c, my_cv, reg, my_scorer, c_y = None):
 
         # regress nuisance (X)
         # nuis_reg = LinearRegression(); nuis_reg.fit(c_train, X_train)
-        nuis_reg = KernelRidge(kernel='rbf'); nuis_reg.fit(c_train, X_train)
+        nuis_reg = copy.deepcopy(reg); nuis_reg.fit(c_train, X_train)
         X_pred = nuis_reg.predict(c_train); X_train = X_train - X_pred
         X_pred = nuis_reg.predict(c_test); X_test = X_test - X_pred
 
-        # # regress nuisance (y)
-        # if c_y is None:  
-        #     # nuis_reg = LinearRegression(); nuis_reg.fit(c_train, y_train)
-        #     nuis_reg = KernelRidge(kernel='rbf'); nuis_reg.fit(c_train, y_train)
-        #     y_pred = nuis_reg.predict(c_train); y_train = y_train - y_pred
-        #     y_pred = nuis_reg.predict(c_test); y_test = y_test - y_pred
-        # elif c_y is not None:
-        #     # nuis_reg = LinearRegression(); nuis_reg.fit(c_y_train, y_train)
-        #     nuis_reg = KernelRidge(kernel='rbf'); nuis_reg.fit(c_y_train, y_train)
-        #     y_pred = nuis_reg.predict(c_y_train); y_train = y_train - y_pred
-        #     y_pred = nuis_reg.predict(c_y_test); y_test = y_test - y_pred
+        # regress nuisance (y)
+        if c_y is None:  
+            nuis_reg = copy.deepcopy(reg); nuis_reg.fit(c_train, y_train)
+            y_pred = nuis_reg.predict(c_train); y_train = y_train - y_pred
+            y_pred = nuis_reg.predict(c_test); y_test = y_test - y_pred
+        elif c_y is not None:
+            nuis_reg = copy.deepcopy(reg); nuis_reg.fit(c_y_train, y_train)
+            y_pred = nuis_reg.predict(c_y_train); y_train = y_train - y_pred
+            y_pred = nuis_reg.predict(c_y_test); y_test = y_test - y_pred
 
         reg.fit(X_train, y_train)
         accuracy[k] = my_scorer(reg, X_test, y_test)
