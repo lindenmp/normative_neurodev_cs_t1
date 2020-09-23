@@ -33,13 +33,11 @@ from func import set_proj_env, my_get_cmap, get_fdr_p
 # In[3]:
 
 
-train_test_str = 'squeakycleanExclude'
+train_test_str = 'train_test'
 exclude_str = 't1Exclude' # 't1Exclude' 'fsFinalExclude'
 parc_str = 'schaefer' # 'schaefer' 'lausanne'
 parc_scale = 400 # 200 400 | 60 125 250
-extra_str = ''
-parcel_names, parcel_loc, drop_parcels, num_parcels, yeo_idx, yeo_labels = set_proj_env(train_test_str = train_test_str, exclude_str = exclude_str,
-                                                                                        parc_str = parc_str, parc_scale = parc_scale)
+parcel_names, parcel_loc, drop_parcels, num_parcels, yeo_idx, yeo_labels = set_proj_env(exclude_str = exclude_str, parc_str = parc_str, parc_scale = parc_scale)
 
 
 # In[4]:
@@ -68,6 +66,9 @@ phenos = ['Overall_Psychopathology','Psychosis_Positive','Psychosis_NegativeDiso
 phenos_label_short = ['Ov. Psych.', 'Psy. (pos.)', 'Psy. (neg.)', 'Anx.-mis.', 'Ext.', 'Fear']
 phenos_label = ['Overall Psychopathology','Psychosis (Positive)','Psychosis (Negative)','Anxious-Misery','Externalizing','Fear']
 
+# phenos = ['mood_4factorv2', 'psychosis_4factorv2','externalizing_4factorv2', 'phobias_4factorv2','overall_psychopathology_4factorv2']
+# phenos_label = ['mood', 'psychosis','externalizing', 'phobias','overall_psychopathology']
+
 
 # ## Setup plots
 
@@ -87,41 +88,50 @@ cmap = my_get_cmap('pair')
 
 df = pd.read_csv(os.path.join(os.environ['PIPELINEDIR'], '1_compute_node_features', 'out', outfile_prefix+'df.csv'))
 df.set_index(['bblid', 'scanid'], inplace = True)
+print(df.shape)
 
 
 # In[9]:
 
 
-df['sex'].unique()
+# train/test proportion
+print('train N:', np.sum(df.loc[:,train_test_str] == 0))
+print('test N:', np.sum(df.loc[:,train_test_str] == 1))
 
 
 # In[10]:
+
+
+df['sex'].unique()
+
+
+# In[11]:
 
 
 print(np.sum(df.loc[:,'sex'] == 1))
 print((np.sum(df.loc[:,'sex'] == 1)/df.shape[0]) * 100)
 
 
-# In[11]:
+# In[12]:
 
 
 print(np.sum(df.loc[:,'sex'] == 2))
 print((np.sum(df.loc[:,'sex'] == 2)/df.shape[0]) * 100)
 
 
-# In[12]:
+# In[13]:
 
 
 df['ageAtScan1_Years'].mean()
 
 
-# In[13]:
+# In[14]:
 
 
 df['ageAtScan1_Years'].std()
 
 
-# In[14]:
+# In[15]:
 
 
 for pheno in phenos:
@@ -130,7 +140,7 @@ for pheno in phenos:
 
 # 0 = Male, 1 = Female
 
-# In[15]:
+# In[16]:
 
 
 # train/test proportion
@@ -143,7 +153,7 @@ print('test, sex = 2, N:',np.sum(df.loc[df.loc[:,train_test_str] == 1,'sex'] == 
 
 # ### Sex
 
-# In[16]:
+# In[17]:
 
 
 stats = pd.DataFrame(index = phenos, columns = ['test_stat', 'pval'])
@@ -162,7 +172,7 @@ stats.loc[:,'sig'] = stats.loc[:,'pval_corr'] < 0.05
 stats
 
 
-# In[17]:
+# In[18]:
 
 
 f, ax = plt.subplots(1,len(phenos))
@@ -192,12 +202,12 @@ f.savefig(outfile_prefix+'symptoms_distributions_sex.png', dpi = 300, bbox_inche
 
 # ### Age
 
-# In[18]:
+# In[19]:
 
 
 stats = pd.DataFrame(index = phenos, columns = ['r', 'pval'])
-
-x = df['ageAtScan1_Years']
+xvar = 'ageAtScan1_Years'
+x = df[xvar]
 for i, pheno in enumerate(phenos):
     y = df[pheno]
     r,p = sp.stats.pearsonr(x,y)
@@ -208,21 +218,17 @@ for i, pheno in enumerate(phenos):
 stats.loc[:,'pval_corr'] = get_fdr_p(stats.loc[:,'pval'])
 stats.loc[:,'sig'] = stats.loc[:,'pval_corr'] < 0.05
 
-stats
-
-
-# In[19]:
-
+print(stats)
 
 f, ax = plt.subplots(1,len(phenos))
 f.set_figwidth(len(phenos)*5)
 f.set_figheight(5)
 
-x = df['ageAtScan1_Years']
+x = df[xvar]
 for i, pheno in enumerate(phenos):
     y = df[pheno]
     plot_data = pd.merge(x,y, on=['bblid','scanid'])
-    sns.regplot(x = 'ageAtScan1_Years', y = pheno, data = plot_data, ax=ax[i])
+    sns.regplot(x = xvar, y = pheno, data = plot_data, ax=ax[i])
     
     if stats.loc[pheno,'sig']:
         ax[i].set_title('r:' + str(np.round(stats.loc[pheno,'r'],2)) + ', p-value: ' + str(np.round(stats.loc[pheno,'pval_corr'],4)), fontweight="bold")
@@ -233,9 +239,48 @@ for i, pheno in enumerate(phenos):
 f.savefig(outfile_prefix+'symptoms_correlations_age.png', dpi = 300, bbox_inches = 'tight', pad_inches = 0)
 
 
-# ### Diagnostic table
+# ### Age
 
 # In[20]:
+
+
+stats = pd.DataFrame(index = phenos, columns = ['r', 'pval'])
+xvar = 'medu1'
+x = df[xvar]
+for i, pheno in enumerate(phenos):
+    y = df[pheno]
+    r,p = sp.stats.pearsonr(x,y)
+    
+    stats.loc[pheno,'r'] = r
+    stats.loc[pheno,'pval'] = p
+    
+stats.loc[:,'pval_corr'] = get_fdr_p(stats.loc[:,'pval'])
+stats.loc[:,'sig'] = stats.loc[:,'pval_corr'] < 0.05
+
+print(stats)
+
+f, ax = plt.subplots(1,len(phenos))
+f.set_figwidth(len(phenos)*5)
+f.set_figheight(5)
+
+x = df[xvar]
+for i, pheno in enumerate(phenos):
+    y = df[pheno]
+    plot_data = pd.merge(x,y, on=['bblid','scanid'])
+    sns.regplot(x = xvar, y = pheno, data = plot_data, ax=ax[i])
+    
+    if stats.loc[pheno,'sig']:
+        ax[i].set_title('r:' + str(np.round(stats.loc[pheno,'r'],2)) + ', p-value: ' + str(np.round(stats.loc[pheno,'pval_corr'],4)), fontweight="bold")
+    else:
+        ax[i].set_title('r:' + str(np.round(stats.loc[pheno,'r'],2)) + ', p-value: ' + str(np.round(stats.loc[pheno,'pval_corr'],4)))
+    ax[i].tick_params(pad = -2)
+    
+f.savefig(outfile_prefix+'symptoms_correlations_medu.png', dpi = 300, bbox_inches = 'tight', pad_inches = 0)
+
+
+# ### Diagnostic table
+
+# In[21]:
 
 
 # to_screen = ['goassessSmryPsy', 'goassessSmryMood', 'goassessSmryEat', 'goassessSmryAnx', 'goassessSmryBeh']
@@ -244,7 +289,7 @@ f.savefig(outfile_prefix+'symptoms_correlations_age.png', dpi = 300, bbox_inches
 # print(counts/df.shape[0]*100)
 
 
-# In[21]:
+# In[22]:
 
 
 to_screen = ['goassessSmryPsy','goassessSmryMan', 'goassessSmryDep', 'goassessSmryBul', 'goassessSmryAno', 'goassessSmrySoc',
@@ -255,39 +300,39 @@ print(counts)
 print(counts/df.shape[0]*100)
 
 
-# In[22]:
+# In[23]:
 
 
 to_keep = counts[counts >= 50].index
 list(to_keep)
 
 
-# In[23]:
+# In[24]:
 
 
 counts[counts >= 50]
 
 
-# In[24]:
-
-
-my_xticklabels = ['Psychosis spectrum (n=97)',
-                 'Depression (n=192)',
-                 'Social anxiety disorder (n=327)',
-                 'Agoraphobia (n=80)',
-                 'PTSD (n=171)',
-                 'ADHD (n=229)',
-                 'ODD (n=458)',
-                 'Conduct disorder (n=121)']
-
-
 # In[25]:
+
+
+my_xticklabels = ['Psychosis spectrum (n=96)',
+                 'Depression (n=191)',
+                 'Social anxiety disorder (n=318)',
+                 'Agoraphobia (n=77)',
+                 'PTSD (n=168)',
+                 'ADHD (n=226)',
+                 'ODD (n=448)',
+                 'Conduct disorder (n=114)']
+
+
+# In[26]:
 
 
 sns.set(style='white', context = 'paper', font_scale = 1)
 
 
-# In[26]:
+# In[27]:
 
 
 f, ax = plt.subplots(1,len(phenos))
