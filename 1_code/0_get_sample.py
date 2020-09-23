@@ -245,7 +245,7 @@ for i, pheno in enumerate(phenos):
     # store normalized version
     df.loc[:,pheno] = x
 
-print(np.sum(rank_r < 1))
+print(np.sum(rank_r < 0.99))
 
 
 # In[20]:
