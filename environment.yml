@@ -105,6 +105,7 @@ dependencies:
     - pytz==2020.1
     - pyyaml==5.3.1
     - pyzmq==19.0.2
+    - regressors==0.0.3
     - requests==2.24.0
     - scikit-learn==0.23.2
     - scipy==1.5.2

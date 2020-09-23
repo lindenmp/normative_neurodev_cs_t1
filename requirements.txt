@@ -85,6 +85,7 @@ python-utils==2.4.0
 pytz==2020.1
 PyYAML==5.3.1
 pyzmq==19.0.2
+regressors==0.0.3
 requests==2.24.0
 scikit-learn==0.23.2
 scipy==1.5.2
