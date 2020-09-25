@@ -175,7 +175,7 @@ df[df[train_test_str] == 1].to_csv(os.path.join(outputdir, outfile_prefix+'test.
 df[df[train_test_str] == 1].to_csv(os.path.join(outputdir, outfile_prefix+'cov_test.txt'), columns = covs, sep = ' ', index = False, header = False)
 
 
-# In[ ]:
+# In[17]:
 
 
 # Write out training
@@ -197,7 +197,7 @@ print(str(resp_train.shape[1]) + ' features written out for normative modeling')
 
 # ### Forward variants
 
-# In[ ]:
+# In[18]:
 
 
 # Synthetic cov data
