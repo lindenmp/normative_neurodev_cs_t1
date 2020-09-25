@@ -178,7 +178,9 @@ if train_test_str == 'squeakycleanExclude':
 
     # randomly sample a healthy holdout cohort
     df['train_test'] = df[train_test_str]
-    hold_out = df.loc[df[train_test_str] == 0,:].sample(n=100, random_state=0, replace=False, axis=0).index
+    n=100
+    print(n)
+    hold_out = df.loc[df[train_test_str] == 0,:].sample(n=n, random_state=0, replace=False, axis=0).index
     df.loc[hold_out,'train_test'] = 1
     print('Train:', np.sum(df['train_test'] == 0), 'Test:', np.sum(df['train_test'] == 1))
 
@@ -265,7 +267,7 @@ header = ['squeakycleanExclude', 'train_test', 'ageAtScan1', 'ageAtScan1_Years',
           'goassessSmryPan', 'goassessSmryAgr', 'goassessSmryOcd', 'goassessSmryPtd', 'goassessSmryPsy', 'goassessSmryDel',
           'goassessSmryHal', 'goassessSmryHalAv', 'goassessSmryHalAs', 'goassessSmryHalVh', 'goassessSmryHalOh', 'goassessSmryHalTh',
           'goassessSmryBeh', 'goassessSmryAdd', 'goassessSmryOdd', 'goassessSmryCon', 'goassessSmryPrimePos1', 'goassessSmryPrimeTot',
-          'goassessSmryPrimePos2', 'goassessSmryPsychOverallRtg', 'goassessDxpmr7']
+          'goassessSmryPrimePos2', 'goassessSmryPsychOverallRtg', 'goassessDxpmr4']
 df.to_csv(os.path.join(outputdir, outfile_prefix+'df.csv'), columns = header)
 
 
