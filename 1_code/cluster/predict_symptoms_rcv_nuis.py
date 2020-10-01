@@ -19,6 +19,7 @@ from sklearn.linear_model import Ridge, Lasso, LinearRegression
 from sklearn.kernel_ridge import KernelRidge
 from sklearn.svm import SVR, LinearSVR
 from sklearn.metrics import make_scorer, r2_score, mean_squared_error, mean_absolute_error
+from sklearn.decomposition import PCA
 import copy
 
 # --------------------------------------------------------------------------------------------------------------------
@@ -29,9 +30,10 @@ parser.add_argument("-y", help="DVs", dest="y_file", default=None)
 parser.add_argument("-c", help="DVs", dest="c_file", default=None)
 parser.add_argument("-metric", help="brain feature (e.g., ac)", dest="metric", default=None)
 parser.add_argument("-pheno", help="psychopathology dimension", dest="pheno", default=None)
-parser.add_argument("-seed", help="seed for shuffle_data", dest="seed", default=1)
 parser.add_argument("-alg", help="estimator", dest="alg", default=None)
 parser.add_argument("-score", help="score set order", dest="score", default=None)
+parser.add_argument("-runpca", help="whether to run PCA or not", dest="runpca", default=0, type=int)
+parser.add_argument("-runperm", help="whether to run permutation test or not", dest="runperm", default=0, type=int)
 parser.add_argument("-o", help="output directory", dest="outroot", default=None)
 
 args = parser.parse_args()
@@ -41,12 +43,19 @@ y_file = args.y_file
 c_file = args.c_file
 metric = args.metric
 pheno = args.pheno
-# seed = int(args.seed)
-# seed = int(os.environ['SGE_TASK_ID'])-1
 alg = args.alg
 score = args.score
+runpca = args.runpca
+runperm = args.runperm
 outroot = args.outroot
 # --------------------------------------------------------------------------------------------------------------------
+if runpca == 1:
+    print('Running with PCA 80%')
+elif runpca == 2:
+    print('Running with PCA 1%')
+
+if runperm == 1:
+    print('Running with permutation test')
 
 # --------------------------------------------------------------------------------------------------------------------
 # prediction functions
@@ -102,10 +111,24 @@ def get_cv(y, n_splits = 10):
     return my_cv
 
 
-def my_cross_val_score(X, y, c, my_cv, reg, my_scorer):
+def my_cross_val_score(X, y, c, my_cv, reg, my_scorer, runpca=1):
     
     accuracy = np.zeros(len(my_cv),)
     y_pred_out = np.zeros(y.shape)
+
+    # find number of PCs
+    if runpca == 1:
+        pca = PCA(n_components = X.shape[1], svd_solver = 'full')
+        pca.fit(StandardScaler().fit_transform(X))
+        cum_var = np.cumsum(pca.explained_variance_ratio_)
+        n_components = np.where(cum_var >= 0.8)[0][0]+1
+        print(n_components)
+    elif runpca == 2:
+        pca = PCA(n_components = X.shape[1], svd_solver = 'full')
+        pca.fit(StandardScaler().fit_transform(X))
+        var_idx = pca.explained_variance_ratio_ >= .01
+        n_components = np.sum(var_idx)
+        print(n_components)
 
     for k in np.arange(len(my_cv)):
         tr = my_cv[k][0]
@@ -126,11 +149,17 @@ def my_cross_val_score(X, y, c, my_cv, reg, my_scorer):
         c_train = pd.DataFrame(data = c_train, index = c.iloc[tr,:].index, columns = c.iloc[tr,:].columns)
         c_test = pd.DataFrame(data = c_test, index = c.iloc[te,:].index, columns = c.iloc[te,:].columns)
 
-        # regress nuisance (X)
-        # nuis_reg = LinearRegression(); nuis_reg.fit(c_train, X_train)
-        nuis_reg = copy.deepcopy(reg); nuis_reg.fit(c_train, X_train)
-        X_pred = nuis_reg.predict(c_train); X_train = X_train - X_pred
-        X_pred = nuis_reg.predict(c_test); X_test = X_test - X_pred
+        # # regress nuisance (X) 
+        # # nuis_reg = LinearRegression(); nuis_reg.fit(c_train, X_train)
+        # nuis_reg = copy.deepcopy(reg); nuis_reg.fit(c_train, X_train)
+        # X_pred = nuis_reg.predict(c_train); X_train = X_train - X_pred
+        # X_pred = nuis_reg.predict(c_test); X_test = X_test - X_pred
+
+        if runpca == 1 or runpca == 2:
+            pca = PCA(n_components = n_components, svd_solver = 'full')
+            pca.fit(X_train)
+            X_train = pca.transform(X_train)
+            X_test = pca.transform(X_test)
 
         # regress nuisance (y)
         nuis_reg = copy.deepcopy(reg); nuis_reg.fit(c_train, y_train)
@@ -144,15 +173,40 @@ def my_cross_val_score(X, y, c, my_cv, reg, my_scorer):
     return accuracy, y_pred_out
 
 
-def run_reg(X, y, c, reg, my_scorer, n_splits = 10, seed = 0):
+def run_reg(X, y, c, reg, my_scorer, n_splits = 10, seed = 0, runpca = 1):
 
     X_shuf, y_shuf, c_shuf = shuffle_data(X = X, y = y, c = c, seed = seed)
 
     my_cv = get_cv(y_shuf, n_splits = n_splits)
 
-    accuracy, y_pred_out = my_cross_val_score(X = X_shuf, y = y_shuf, c = c_shuf, my_cv = my_cv, reg = reg, my_scorer = my_scorer)
+    accuracy, y_pred_out = my_cross_val_score(X = X_shuf, y = y_shuf, c = c_shuf, my_cv = my_cv, reg = reg, my_scorer = my_scorer, runpca = runpca)
 
     return accuracy, y_pred_out
+
+
+def run_perm(X, y, c, reg, my_scorer, n_splits = 10, runpca = 1):
+
+    X.reset_index(drop = True, inplace = True)
+
+    my_cv = get_cv(y, n_splits = n_splits)
+
+    n_perm = 5000
+    permuted_acc = np.zeros((n_perm,))
+
+    for i in np.arange(n_perm):
+        np.random.seed(i)
+        idx = np.arange(y.shape[0])
+        np.random.shuffle(idx)
+
+        y_perm = y.iloc[idx].copy()
+        y_perm.reset_index(drop = True, inplace = True)
+        c_perm = c.iloc[idx,:].copy()
+        c_perm.reset_index(drop = True, inplace = True)
+            
+        temp_acc, y_pred_out_tmp = my_cross_val_score(X = X, y = y_perm, c = c_perm, my_cv = my_cv, reg = reg, my_scorer = my_scorer, runpca = runpca)
+        permuted_acc[i] = temp_acc.mean()
+
+    return permuted_acc
 
 
 # --------------------------------------------------------------------------------------------------------------------
@@ -198,10 +252,15 @@ accuracy_std = np.zeros(num_random_splits)
 y_pred_out_repeats = np.zeros((y.shape[0],num_random_splits))
 
 for i in np.arange(0,num_random_splits):
-    accuracy, y_pred_out = run_reg(X = X, y = y, c = c, reg = regs[alg], my_scorer = my_scorer, seed = i)
+    accuracy, y_pred_out = run_reg(X = X, y = y, c = c, reg = regs[alg], my_scorer = my_scorer, seed = i, runpca = runpca)
     accuracy_mean[i] = accuracy.mean()
     accuracy_std[i] = accuracy.std()
     y_pred_out_repeats[:,i] = y_pred_out
+
+if runperm == 1:
+    print('Running permutation test...')
+    permuted_acc = run_perm(X = X, y = y, c = c, reg = regs[alg], my_scorer = my_scorer, runpca = runpca)
+    print('...done')
 
 # --------------------------------------------------------------------------------------------------------------------
 
@@ -210,6 +269,8 @@ for i in np.arange(0,num_random_splits):
 np.savetxt(os.path.join(outdir,'accuracy_mean.txt'), accuracy_mean)
 np.savetxt(os.path.join(outdir,'accuracy_std.txt'), accuracy_std)
 np.savetxt(os.path.join(outdir,'y_pred_out_repeats.txt'), y_pred_out_repeats)
+if runperm == 1:
+    np.savetxt(os.path.join(outdir,'permuted_acc.txt'), permuted_acc)
 
 # --------------------------------------------------------------------------------------------------------------------
 
