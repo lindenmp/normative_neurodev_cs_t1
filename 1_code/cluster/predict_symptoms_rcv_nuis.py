@@ -53,6 +53,8 @@ if runpca == 1:
     print('Running with PCA 80%')
 elif runpca == 2:
     print('Running with PCA 1%')
+elif runpca == 3:
+    print('Running PCA with fixed n_components')
 
 if runperm == 1:
     print('Running with permutation test')
@@ -129,6 +131,9 @@ def my_cross_val_score(X, y, c, my_cv, reg, my_scorer, runpca=1):
         var_idx = pca.explained_variance_ratio_ >= .01
         n_components = np.sum(var_idx)
         print(n_components)
+    elif runpca == 3:
+        n_components = 8
+        print(n_components)
 
     for k in np.arange(len(my_cv)):
         tr = my_cv[k][0]
@@ -155,7 +160,7 @@ def my_cross_val_score(X, y, c, my_cv, reg, my_scorer, runpca=1):
         # X_pred = nuis_reg.predict(c_train); X_train = X_train - X_pred
         # X_pred = nuis_reg.predict(c_test); X_test = X_test - X_pred
 
-        if runpca == 1 or runpca == 2:
+        if runpca != 0:
             pca = PCA(n_components = n_components, svd_solver = 'full')
             pca.fit(X_train)
             X_train = pca.transform(X_train)
@@ -190,7 +195,7 @@ def run_perm(X, y, c, reg, my_scorer, n_splits = 10, runpca = 1):
 
     my_cv = get_cv(y, n_splits = n_splits)
 
-    n_perm = 5000
+    n_perm = 10000
     permuted_acc = np.zeros((n_perm,))
 
     for i in np.arange(n_perm):
