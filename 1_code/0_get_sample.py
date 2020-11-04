@@ -179,6 +179,7 @@ if train_test_str == 'squeakycleanExclude':
     # randomly sample a healthy holdout cohort
     df['train_test'] = df[train_test_str]
     n=100
+#     n=np.round(df.loc[df[train_test_str] == 0,:].shape[0]*.5).astype(int)
     print(n)
     hold_out = df.loc[df[train_test_str] == 0,:].sample(n=n, random_state=0, replace=False, axis=0).index
     df.loc[hold_out,'train_test'] = 1
