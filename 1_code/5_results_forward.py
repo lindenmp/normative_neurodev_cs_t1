@@ -33,13 +33,11 @@ from func import set_proj_env, my_get_cmap, get_fdr_p
 # In[3]:
 
 
-train_test_str = 'squeakycleanExclude'
+train_test_str = 'train_test'
 exclude_str = 't1Exclude' # 't1Exclude' 'fsFinalExclude'
 parc_str = 'schaefer' # 'schaefer' 'lausanne'
 parc_scale = 400 # 200 400 | 60 125 250
-extra_str = ''
-parcel_names, parcel_loc, drop_parcels, num_parcels, yeo_idx, yeo_labels = set_proj_env(train_test_str = train_test_str, exclude_str = exclude_str,
-                                                                                        parc_str = parc_str, parc_scale = parc_scale)
+parcel_names, parcel_loc, drop_parcels, num_parcels, yeo_idx, yeo_labels = set_proj_env(exclude_str = exclude_str, parc_str = parc_str, parc_scale = parc_scale)
 
 
 # In[4]:
@@ -91,14 +89,35 @@ df_node = pd.concat((df_node_train, df_node_test), axis = 0); print(df_node.shap
 # In[8]:
 
 
-smse = np.loadtxt(os.path.join(os.environ['PIPELINEDIR'], '3_run_normative', outfile_prefix+'out', 'smse.txt'), delimiter = ' ').transpose()
+smse = np.loadtxt(os.path.join(os.environ['PIPELINEDIR'], '4_run_normative', outfile_prefix+'out', 'smse.txt'), delimiter = ' ').transpose()
 df_smse = pd.DataFrame(data = smse, index = df_node.columns)
+
+expv = np.loadtxt(os.path.join(os.environ['PIPELINEDIR'], '4_run_normative', outfile_prefix+'out', 'expv.txt'), delimiter = ' ').transpose()
+df_expv = pd.DataFrame(data = expv, index = df_node.columns)
 
 
 # In[9]:
 
 
-smse_thresh = 1
+sns.set(style='white', context = 'paper', font_scale = 0.8)
+f, ax = plt.subplots(1,2)
+f.set_figwidth(3.5)
+f.set_figheight(1.75)
+
+sns.histplot(smse, ax=ax[0])
+ax[0].set_xlabel('Standardized \nmean squared error')
+ax[0].tick_params(pad = -2)
+ax[0].set_ylabel('Count', labelpad=-1)
+ax[0].set_ylim([0,120])
+
+sns.histplot(expv, ax=ax[1])
+ax[1].set_xlabel('Explained variance')
+ax[1].tick_params(pad = -2)
+ax[1].set_ylabel('')
+ax[1].set_ylim([0,120])
+ax[1].set_yticklabels('')
+
+f.savefig(outfile_prefix+'nm_diagnostics.svg', dpi = 300, bbox_inches = 'tight', pad_inches = 0)
 
 
 # ## Load nispat outputs
@@ -110,10 +129,10 @@ smse_thresh = 1
 synth_cov_test = pd.read_csv(os.path.join(os.environ['PIPELINEDIR'], '2_prepare_normative', 'out', outfile_prefix+'cov_test_forward.txt'),
                              delim_whitespace = True, names=['ageAtScan1_Years', 'sex_adj'])
 
-yhat_forward = np.loadtxt(os.path.join(os.environ['PIPELINEDIR'], '3_run_normative', outfile_prefix+'out_forward', 'yhat.txt'), delimiter = ' ').transpose()
+yhat_forward = np.loadtxt(os.path.join(os.environ['PIPELINEDIR'], '4_run_normative', outfile_prefix+'out_forward', 'yhat.txt'), delimiter = ' ').transpose()
 df_yhat_forward = pd.DataFrame(data = yhat_forward, index = synth_cov_test.index, columns = df_node.columns)
 
-ys2_forward = np.loadtxt(os.path.join(os.environ['PIPELINEDIR'], '3_run_normative', outfile_prefix+'out_forward', 'ys2.txt'), delimiter = ' ').transpose()
+ys2_forward = np.loadtxt(os.path.join(os.environ['PIPELINEDIR'], '4_run_normative', outfile_prefix+'out_forward', 'ys2.txt'), delimiter = ' ').transpose()
 df_ys2_forward = pd.DataFrame(data = ys2_forward, index = synth_cov_test.index, columns = df_node.columns)
 
 
@@ -164,9 +183,9 @@ os.chdir(figdir)
 sns.set(style='white', context = 'paper', font_scale = 1)
 cmap = my_get_cmap('pair')
 
-metrics = ['ct', 'vol']
-metrics_label_short = ['Thickness', 'Volume']
-metrics_label = ['Thickness', 'Volume']
+metrics = ['vol',]
+metrics_label_short = ['Volume',]
+metrics_label = ['Volume',]
 print(metrics)
 
 
@@ -208,24 +227,16 @@ for metric in metrics:
                 roi_data = df_yhat_diff.loc[:,0].filter(regex = metric, axis = 0).values
             elif sx == 'sex1':
                 roi_data = df_yhat_diff.loc[:,1].filter(regex = metric, axis = 0).values
-            region_filt = df_smse.filter(regex = metric, axis = 0).loc[:,0] < smse_thresh
+            
+            center_anchor = 1
 
-            roi_data[~region_filt] = -1000
-            if metric == 'ct':
-                center_anchor = 1
-            elif metric == 'vol':
-                center_anchor = 1
+            if subject_id == 'lausanne125':
+                parc_file = os.path.join('/Applications/freesurfer/subjects/', subject_id, 'label', hemi + '.myaparc_' + str(parc_scale) + '.annot')
+            elif subject_id == 'fsaverage':
+                parc_file = os.path.join('/Users/lindenmp/Google-Drive-Penn/work/research_projects/normative_neurodev_cs_t1/figs_support/Parcellations/FreeSurfer5.3/fsaverage/label/',
+                                         hemi + '.Schaefer2018_' + str(parc_scale) + 'Parcels_17Networks_order.annot')
 
-            if region_filt.any():
-                if subject_id == 'lausanne125':
-                    parc_file = os.path.join('/Applications/freesurfer/subjects/', subject_id, 'label', hemi + '.myaparc_' + str(parc_scale) + '.annot')
-                elif subject_id == 'fsaverage':
-                    parc_file = os.path.join('/Users/lindenmp/Google-Drive-Penn/work/research_projects/normative_neurodev_cs_t1/figs_support/Parcellations/FreeSurfer5.3/fsaverage/label/',
-                                             hemi + '.Schaefer2018_' + str(parc_scale) + 'Parcels_17Networks_order.annot')
-
-                brain_plot(roi_data, parcel_names, parc_file, fig_str, subject_id = subject_id, hemi = hemi, color = 'coolwarm', center_anchor = center_anchor)
-            else:
-                print('Nothing significant')
+            brain_plot(roi_data, parcel_names, parc_file, fig_str, subject_id = subject_id, hemi = hemi, color = 'coolwarm', center_anchor = center_anchor)
 
 
 # # Figures
@@ -247,53 +258,51 @@ f.savefig('colorbar_'+str(limit)+'.svg', dpi = 300, bbox_inches = 'tight', pad_i
 # In[19]:
 
 
-for my_str in ('_sex0_frwd', '_sex1_frwd'):
-    # Age effects
-    f, axes = plt.subplots(2, 4)
-    f.set_figwidth(4)
-    f.set_figheight(2)
-    plt.subplots_adjust(wspace=0, hspace=0)
+# Age effects
+f, axes = plt.subplots(2, 4)
+f.set_figwidth(4)
+f.set_figheight(2)
+plt.subplots_adjust(wspace=0, hspace=0)
 
 
-    # column 0:
-    fig_str = 'lh_ct_age'+my_str+'.png'
-    try:
-        image = mpimg.imread('lat_' + fig_str); axes[0,0].imshow(image); axes[0,0].axis('off')
-    except FileNotFoundError: axes[0,0].axis('off')
-    try:
-        image = mpimg.imread('med_' + fig_str); axes[1,0].imshow(image); axes[1,0].axis('off')
-    except FileNotFoundError: axes[1,0].axis('off')
+# column 0:
+fig_str = 'lh_vol_age_sex0_frwd.png'
+try:
+    image = mpimg.imread('lat_' + fig_str); axes[0,0].imshow(image); axes[0,0].axis('off')
+except FileNotFoundError: axes[0,0].axis('off')
+try:
+    image = mpimg.imread('med_' + fig_str); axes[1,0].imshow(image); axes[1,0].axis('off')
+except FileNotFoundError: axes[1,0].axis('off')
 
-    # column 1:
-    fig_str = 'rh_ct_age'+my_str+'.png'
-    try:
-        image = mpimg.imread('lat_' + fig_str); axes[0,1].imshow(image); axes[0,1].axis('off')
-    except FileNotFoundError: axes[0,1].axis('off')
-    try:
-        image = mpimg.imread('med_' + fig_str); axes[1,1].imshow(image); axes[1,1].axis('off')
-    except FileNotFoundError: axes[1,1].axis('off')
+# column 1:
+fig_str = 'rh_vol_age_sex0_frwd.png'
+try:
+    image = mpimg.imread('lat_' + fig_str); axes[0,1].imshow(image); axes[0,1].axis('off')
+except FileNotFoundError: axes[0,1].axis('off')
+try:
+    image = mpimg.imread('med_' + fig_str); axes[1,1].imshow(image); axes[1,1].axis('off')
+except FileNotFoundError: axes[1,1].axis('off')
 
-    # column 2:
-    fig_str = 'lh_vol_age'+my_str+'.png'
-    try:
-        image = mpimg.imread('lat_' + fig_str); axes[0,2].imshow(image); axes[0,2].axis('off')
-    except FileNotFoundError: axes[0,2].axis('off')
-    try:
-        image = mpimg.imread('med_' + fig_str); axes[1,2].imshow(image); axes[1,2].axis('off')
-    except FileNotFoundError: axes[1,2].axis('off')
+# column 2:
+fig_str = 'lh_vol_age_sex1_frwd.png'
+try:
+    image = mpimg.imread('lat_' + fig_str); axes[0,2].imshow(image); axes[0,2].axis('off')
+except FileNotFoundError: axes[0,2].axis('off')
+try:
+    image = mpimg.imread('med_' + fig_str); axes[1,2].imshow(image); axes[1,2].axis('off')
+except FileNotFoundError: axes[1,2].axis('off')
 
-    # column 3:
-    fig_str = 'rh_vol_age'+my_str+'.png'
-    try:
-        image = mpimg.imread('lat_' + fig_str); axes[0,3].imshow(image); axes[0,3].axis('off')
-    except FileNotFoundError: axes[0,3].axis('off')
-    try:
-        image = mpimg.imread('med_' + fig_str); axes[1,3].imshow(image); axes[1,3].axis('off')
-    except FileNotFoundError: axes[1,3].axis('off')
+# column 3:
+fig_str = 'rh_vol_age_sex1_frwd.png'
+try:
+    image = mpimg.imread('lat_' + fig_str); axes[0,3].imshow(image); axes[0,3].axis('off')
+except FileNotFoundError: axes[0,3].axis('off')
+try:
+    image = mpimg.imread('med_' + fig_str); axes[1,3].imshow(image); axes[1,3].axis('off')
+except FileNotFoundError: axes[1,3].axis('off')
 
-    plt.show()
-    f.savefig(outfile_prefix+'brain_age'+my_str+'.svg', dpi = 1000, bbox_inches = 'tight', pad_inches = 0)
-#     f.savefig('brain_age'+my_str+'.png', dpi = 300, bbox_inches = 'tight', pad_inches = 0)
+plt.show()
+f.savefig(outfile_prefix+'brain_age.svg', dpi = 1000, bbox_inches = 'tight', pad_inches = 0)
 
 
 # In[20]:
