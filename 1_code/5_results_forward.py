@@ -100,6 +100,8 @@ df_expv = pd.DataFrame(data = expv, index = df_node.columns)
 
 
 sns.set(style='white', context = 'paper', font_scale = 0.8)
+sns.set_style({'font.family':'sans-serif', 'font.sans-serif':['Public Sans']})
+
 f, ax = plt.subplots(1,2)
 f.set_figwidth(3.5)
 f.set_figheight(1.75)
@@ -183,6 +185,9 @@ os.chdir(figdir)
 sns.set(style='white', context = 'paper', font_scale = 1)
 cmap = my_get_cmap('pair')
 
+# metrics = ['ct', 'vol']
+# metrics_label_short = ['Thickness', 'Volume']
+# metrics_label = ['Thickness', 'Volume']
 metrics = ['vol',]
 metrics_label_short = ['Volume',]
 metrics_label = ['Volume',]
@@ -306,6 +311,58 @@ f.savefig(outfile_prefix+'brain_age.svg', dpi = 1000, bbox_inches = 'tight', pad
 
 
 # In[20]:
+
+
+# for my_str in ('_sex0_frwd', '_sex1_frwd'):
+#     # Age effects
+#     f, axes = plt.subplots(2, 4)
+#     f.set_figwidth(4)
+#     f.set_figheight(2)
+#     plt.subplots_adjust(wspace=0, hspace=0)
+
+
+#     # column 0:
+#     fig_str = 'lh_ct_age'+my_str+'.png'
+#     try:
+#         image = mpimg.imread('lat_' + fig_str); axes[0,0].imshow(image); axes[0,0].axis('off')
+#     except FileNotFoundError: axes[0,0].axis('off')
+#     try:
+#         image = mpimg.imread('med_' + fig_str); axes[1,0].imshow(image); axes[1,0].axis('off')
+#     except FileNotFoundError: axes[1,0].axis('off')
+
+#     # column 1:
+#     fig_str = 'rh_ct_age'+my_str+'.png'
+#     try:
+#         image = mpimg.imread('lat_' + fig_str); axes[0,1].imshow(image); axes[0,1].axis('off')
+#     except FileNotFoundError: axes[0,1].axis('off')
+#     try:
+#         image = mpimg.imread('med_' + fig_str); axes[1,1].imshow(image); axes[1,1].axis('off')
+#     except FileNotFoundError: axes[1,1].axis('off')
+
+#     # column 2:
+#     fig_str = 'lh_vol_age'+my_str+'.png'
+#     try:
+#         image = mpimg.imread('lat_' + fig_str); axes[0,2].imshow(image); axes[0,2].axis('off')
+#     except FileNotFoundError: axes[0,2].axis('off')
+#     try:
+#         image = mpimg.imread('med_' + fig_str); axes[1,2].imshow(image); axes[1,2].axis('off')
+#     except FileNotFoundError: axes[1,2].axis('off')
+
+#     # column 3:
+#     fig_str = 'rh_vol_age'+my_str+'.png'
+#     try:
+#         image = mpimg.imread('lat_' + fig_str); axes[0,3].imshow(image); axes[0,3].axis('off')
+#     except FileNotFoundError: axes[0,3].axis('off')
+#     try:
+#         image = mpimg.imread('med_' + fig_str); axes[1,3].imshow(image); axes[1,3].axis('off')
+#     except FileNotFoundError: axes[1,3].axis('off')
+
+#     plt.show()
+#     f.savefig(outfile_prefix+'brain_age'+my_str+'.svg', dpi = 1000, bbox_inches = 'tight', pad_inches = 0)
+# #     f.savefig('brain_age'+my_str+'.png', dpi = 300, bbox_inches = 'tight', pad_inches = 0)
+
+
+# In[21]:
 
 
 for file in figs_to_delete:
