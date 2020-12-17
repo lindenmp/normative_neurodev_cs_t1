@@ -63,8 +63,8 @@ if not os.path.exists(figdir): os.makedirs(figdir)
 
 labels = ['Train', 'Test']
 phenos = ['Overall_Psychopathology','Psychosis_Positive','Psychosis_NegativeDisorg','AnxiousMisery','Externalizing','Fear']
-phenos_label_short = ['Ov. Psych.', 'Psy. (pos.)', 'Psy. (neg.)', 'Anx.-mis.', 'Ext.', 'Fear']
-phenos_label = ['Overall Psychopathology','Psychosis (positive)','Psychosis (negative)','Anxious-misery','Externalizing','Fear']
+phenos_label_short = ['Ov. psych.', 'Psy. (pos.)', 'Psy. (neg.)', 'Anx.-mis.', 'Ext.', 'Fear']
+phenos_label = ['Overall psychopathology','Psychosis (positive)','Psychosis (negative)','Anxious-misery','Externalizing','Fear']
 
 
 # ## Setup plots
@@ -75,6 +75,7 @@ phenos_label = ['Overall Psychopathology','Psychosis (positive)','Psychosis (neg
 if not os.path.exists(figdir): os.makedirs(figdir)
 os.chdir(figdir)
 sns.set(style='white', context = 'paper', font_scale = 0.8)
+sns.set_style({'font.family':'sans-serif', 'font.sans-serif':['Public Sans']})
 cmap = my_get_cmap('pair')
 
 
@@ -129,20 +130,13 @@ np.sum(df.loc[:,'averageManualRating'] == 2)
 # In[15]:
 
 
-for pheno in phenos:
-    print(sp.stats.spearmanr(df.loc[:,'averageManualRating'],df.loc[:,pheno]))
-
-
-# In[16]:
-
-
 # train/test proportion
 print('train N:', np.sum(df.loc[:,train_test_str] == 0))
 print(np.round(df.loc[df.loc[:,train_test_str] == 0,'ageAtScan1_Years'].mean(),2))
 print(np.round(df.loc[df.loc[:,train_test_str] == 0,'ageAtScan1_Years'].std(),2))
 
 
-# In[17]:
+# In[16]:
 
 
 print('test N:', np.sum(df.loc[:,train_test_str] == 1))
@@ -152,7 +146,7 @@ print(np.round(df.loc[df.loc[:,train_test_str] == 1,'ageAtScan1_Years'].std(),2)
 
 # 0 = Male, 1 = Female
 
-# In[18]:
+# In[17]:
 
 
 # train/test proportion
@@ -169,7 +163,7 @@ print(np.round((np.sum(df.loc[df.loc[:,train_test_str] == 1,'sex'] == 2)/np.sum(
 
 # ### Sex
 
-# In[19]:
+# In[18]:
 
 
 stats = pd.DataFrame(index = phenos, columns = ['test_stat', 'pval'])
@@ -190,10 +184,9 @@ stats.loc[:,'sig'] = stats.loc[:,'pval_corr'] < 0.05
 np.round(stats.astype(float),2)
 
 
-# In[20]:
+# In[19]:
 
 
-sns.set(style='white', context = 'paper', font_scale = 0.8)
 f, ax = plt.subplots(1,len(phenos))
 f.set_figwidth(len(phenos)*1.4)
 f.set_figheight(1.25)
@@ -238,19 +231,24 @@ f.savefig(outfile_prefix+'symptoms_distributions_sex.svg', dpi = 300, bbox_inche
 
 # ### nuisance correlations
 
-# In[21]:
+# In[20]:
 
 
-sns.set(style='white', context = 'paper', font_scale = 0.8)
 stats = pd.DataFrame(index = phenos, columns = ['r', 'pval'])
-# covs = ['ageAtScan1_Years', 'mprage_antsCT_vol_TBV', 'medu1', 'averageManualRating']
-covs = ['ageAtScan1_Years', 'medu1']
-# covs_label = ['Age',]
-covs_label = ['Age (yrs)', 'Maternal education \n(yrs)']
+covs = ['ageAtScan1_Years', 'medu1', 'mprage_antsCT_vol_TBV', 'averageManualRating', 'T1_snr']
+covs_label = ['Age (yrs)', 'Maternal education \n(yrs)', 'TBV', 'T1 QA', 'T1 SNR']
+
 for c, cov in enumerate(covs):
     x = df[cov]
+    nan_filt = x.isna()
+    if nan_filt.any():
+        x = x[~nan_filt]
+    
     for i, pheno in enumerate(phenos):
         y = df[pheno]
+        if nan_filt.any():
+            y = y[~nan_filt]
+            
         r,p = sp.stats.pearsonr(x,y)
 
         stats.loc[pheno,'r'] = r
@@ -262,17 +260,22 @@ for c, cov in enumerate(covs):
     f, ax = plt.subplots(1,len(phenos))
     f.set_figwidth(len(phenos)*1.4)
     f.set_figheight(1.25)
-
-    x = df[cov]
+    
     for i, pheno in enumerate(phenos):
         y = df[pheno]
+        if nan_filt.any():
+            y = y[~nan_filt]
+        
         plot_data = pd.merge(x,y, on=['bblid','scanid'])
-        sns.kdeplot(x = cov, y = pheno, data = plot_data, ax=ax[i], color='gray')
+        sns.kdeplot(x = cov, y = pheno, data = plot_data, ax=ax[i], color='gray', thresh=0.05)
         sns.regplot(x = cov, y = pheno, data = plot_data, ax=ax[i], scatter=False)
+#         ax[i].scatter(x = plot_data[cov], y = plot_data[pheno], color='gray', s=1, alpha=0.25)
 
         ax[i].set_ylabel(phenos_label[i], labelpad=-1)
         ax[i].set_xlabel(covs_label[c])
         ax[i].tick_params(pad = -2.5)
+#         ax[i].set_xlim([x.min()-x.min()*.10,
+#                         x.max()+x.max()*.10])
         
         if stats.loc[pheno,'sig']:
             textstr = 'r = {:.2f} \np < 0.05'.format(stats.loc[pheno,'r'])
@@ -283,19 +286,20 @@ for c, cov in enumerate(covs):
                 verticalalignment='top')
 
     f.subplots_adjust(wspace=0.5)
+    f.savefig(outfile_prefix+'symptoms_correlations_'+cov+'.png', dpi = 150, bbox_inches = 'tight', pad_inches = 0.1)
     f.savefig(outfile_prefix+'symptoms_correlations_'+cov+'.svg', dpi = 300, bbox_inches = 'tight', pad_inches = 0)
 
 
 # ### Diagnostic table
 
-# In[22]:
+# In[21]:
 
 
 df['goassessDxpmr4_bin'] = df.loc[:,'goassessDxpmr4'] == '4PS'
 df['goassessDxpmr4_bin'] = df['goassessDxpmr4_bin'].astype(int)*4
 
 
-# In[23]:
+# In[22]:
 
 
 to_screen = ['goassessDxpmr4_bin','goassessSmryMan', 'goassessSmryDep', 'goassessSmryBul', 'goassessSmryAno', 'goassessSmrySoc',
@@ -308,36 +312,43 @@ print(counts)
 print(np.round(counts/df.shape[0]*100,2))
 
 
-# In[24]:
+# In[23]:
 
 
 to_keep = counts[counts >= 50].index
 list(to_keep)
 
 
-# In[25]:
+# In[24]:
 
 
 counts[counts >= 50]
 
 
+# In[25]:
+
+
+# my_xticklabels = ['Psychosis spectrum (n=389)',
+#                  'Depression (n=191)',
+#                  'Social anxiety disorder (n=318)',
+#                  'Agoraphobia (n=77)',
+#                  'PTSD (n=168)',
+#                  'ADHD (n=226)',
+#                  'ODD (n=448)',
+#                  'Conduct disorder (n=114)']
+my_xticklabels = ['Psychosis spectrum (n=364)',
+                 'Depression (n=179)',
+                 'Social anxiety disorder (n=295)',
+                 'Agoraphobia (n=73)',
+                 'PTSD (n=156)',
+                 'ADHD (n=206)',
+                 'ODD (n=407)',
+                 'Conduct disorder (n=102)']
+
+
 # In[26]:
 
 
-my_xticklabels = ['Psychosis spectrum (n=389)',
-                 'Depression (n=191)',
-                 'Social anxiety disorder (n=318)',
-                 'Agoraphobia (n=77)',
-                 'PTSD (n=168)',
-                 'ADHD (n=226)',
-                 'ODD (n=448)',
-                 'Conduct disorder (n=114)']
-
-
-# In[27]:
-
-
-sns.set(style='white', context = 'paper', font_scale = 0.8)
 f, ax = plt.subplots(1,len(phenos))
 f.set_figwidth(len(phenos)*1.4)
 f.set_figheight(2)
@@ -362,4 +373,66 @@ for i, pheno in enumerate(phenos):
         ax[i].set_yticklabels('')
     
 f.savefig(outfile_prefix+'symptom_dimensions_groups.svg', dpi = 300, bbox_inches = 'tight', pad_inches = 0)
+
+
+# # Siblings
+
+# In[27]:
+
+
+def count_dups(df):
+    dup_bool = df['famid'].duplicated(keep=False)
+
+    unique_famid = np.unique(df.loc[dup_bool,'famid'])
+
+    number_dups = np.zeros(len(unique_famid),)
+    for i, famid in enumerate(unique_famid):
+        number_dups[i] = np.sum(df['famid'] == famid)
+        
+    count_of_dups = []
+    unique_dups = np.unique(number_dups)
+    for i in unique_dups:
+        count_of_dups.append(np.sum(number_dups == i))
+
+    
+    return unique_famid, unique_dups, count_of_dups
+
+
+# In[28]:
+
+
+unique_famid, unique_dups, count_of_dups = count_dups(df)
+
+print(len(unique_famid))
+print(count_of_dups)
+print(unique_dups)
+print(np.multiply(count_of_dups,unique_dups))
+
+
+# In[29]:
+
+
+print(np.multiply(count_of_dups,unique_dups))
+
+
+# In[30]:
+
+
+unique_famid, unique_dups, count_of_dups = count_dups(df.loc[df['train_test'] == 0,:])
+
+print(len(unique_famid))
+print(count_of_dups)
+print(unique_dups)
+print(np.multiply(count_of_dups,unique_dups))
+
+
+# In[31]:
+
+
+unique_famid, unique_dups, count_of_dups = count_dups(df.loc[df['train_test'] == 1,:])
+
+print(len(unique_famid))
+print(count_of_dups)
+print(unique_dups)
+print(np.multiply(count_of_dups,unique_dups))
 
