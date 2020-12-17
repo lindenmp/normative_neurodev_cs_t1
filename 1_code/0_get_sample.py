@@ -88,6 +88,8 @@ t1_qa = pd.read_csv(os.path.join(os.environ['DATADIR'], 'external/pncDataFreeze2
 demog = pd.read_csv(os.path.join(os.environ['DATADIR'], 'external/pncDataFreeze20170905/n1601_dataFreeze/demographics/n1601_demographics_go1_20161212.csv'))
 # Brain volume
 brain_vol = pd.read_csv(os.path.join(os.environ['DATADIR'], 'external/pncDataFreeze20170905/n1601_dataFreeze/neuroimaging/t1struct/n1601_ctVol20170412.csv'))
+# dti QA
+dti_qa = pd.read_csv(os.path.join(os.environ['DATADIR'], 'external/pncDataFreeze20170905/n1601_dataFreeze/neuroimaging/dti/n1601_dti_qa_20170301.csv'))
 
 # GOASSESS Bifactor scores
 goassess = pd.read_csv(os.path.join(os.environ['DATADIR'], 'external/GO1_clinical_factor_scores_psychosis_split_BIFACTOR.csv'))
@@ -95,6 +97,8 @@ goassess = pd.read_csv(os.path.join(os.environ['DATADIR'], 'external/GO1_clinica
 clinical = pd.read_csv(os.path.join(os.environ['DATADIR'], 'external/pncDataFreeze20170905/n1601_dataFreeze/clinical/n1601_goassess_psych_summary_vars_20131014.csv'))
 # Psychosis summary
 clinical_psychosis = pd.read_csv(os.path.join(os.environ['DATADIR'], 'external/pncDataFreeze20170905/n1601_dataFreeze/clinical/n1601_diagnosis_dxpmr_20170509.csv'))
+# Cognition
+cnb = pd.read_csv(os.path.join(os.environ['DATADIR'], 'external/pncDataFreeze20170905/n1601_dataFreeze/cnb/n1601_cnb_factor_scores_tymoore_20151006.csv'))
 
 # merge
 df = health
@@ -102,23 +106,59 @@ df = pd.merge(df, prot, on=['scanid', 'bblid']) # prot
 df = pd.merge(df, t1_qa, on=['scanid', 'bblid']) # t1_qa
 df = pd.merge(df, demog, on=['scanid', 'bblid']) # demog
 df = pd.merge(df, brain_vol, on=['scanid', 'bblid']) # brain_vol
+df = pd.merge(df, dti_qa, on=['scanid', 'bblid']) # dti_qa
+
 df = pd.merge(df, clinical, on=['scanid', 'bblid']) # clinical
 df = pd.merge(df, clinical_psychosis, on=['scanid', 'bblid']) # clinical
 df = pd.merge(df, goassess, on=['bblid']) # goassess
+df = pd.merge(df, cnb, on=['scanid', 'bblid']) # cnb
 
 print(df.shape[0])
-df.set_index(['bblid', 'scanid'], inplace = True)
 
 
 # In[9]:
 
 
+#t1 snr
+snr = pd.read_csv(os.path.join(os.environ['DATADIR'], 'external/n1601_snr.txt'), header=None, delimiter='\t')
+
+idx = snr.iloc[:,0]
+
+for idx, row in snr.iterrows():
+    snr.loc[idx,'bblid'] = row[0].split('/')[0]
+    snr.loc[idx,'scanid'] = row[0].split('/')[1].split('x')[1]
+    
+snr['bblid'] = snr['bblid'].astype(int)
+snr['scanid'] = snr['scanid'].astype(int)
+snr.set_index(['bblid', 'scanid'], inplace = True)
+snr['T1_snr'] = snr.loc[:,1]
+
+snr.drop(labels=[0,1], axis=1, inplace=True)
+
+df = pd.merge(df, snr, on=['scanid', 'bblid'])
+
+
+# In[10]:
+
+
+# famid
+famid = pd.read_csv(os.path.join(os.environ['DATADIR'], 'external/PNC_BBLID_FAMID.csv'))
+famid.drop(labels=['cnbDatasetid','study'], axis=1, inplace=True)
+famid = famid.groupby('bblid').nth(0)
+
+df = pd.merge(df, famid, on=['bblid'])
+
+
+# In[11]:
+
+
+df.set_index(['bblid', 'scanid'], inplace = True)
 df.head()
 
 
 # # Filter subjects
 
-# In[10]:
+# In[12]:
 
 
 # 1) Primary sample filter
@@ -130,11 +170,11 @@ df = df[df[exclude_str] == 0]
 print('N after T1 exclusion:', df.shape[0])
 
 
-# In[11]:
+# In[13]:
 
 
 # 3) filter subjects with NaN on key variables
-screen = [train_test_str, 'ageAtScan1', 'sex', 'race2', 'handednessv2', 'medu1', 'mprage_antsCT_vol_TBV', 'averageManualRating',
+screen = [train_test_str, 'ageAtScan1', 'sex', 'race2', 'handednessv2', 'medu1', 'mprage_antsCT_vol_TBV', 'averageManualRating', 'psychoactiveMedPsychv2', 'psychoactiveMedMedicalv2', 'T1_snr', 'famid',
           'Overall_Psychopathology','Psychosis_Positive','Psychosis_NegativeDisorg','AnxiousMisery','Externalizing','Fear']
 
 drop_idx = df.loc[:,screen].isna().any(axis = 1)
@@ -142,19 +182,36 @@ df = df.loc[~drop_idx,:]
 print('N after variable screen:', df.shape[0])
 
 
-# In[12]:
+# In[14]:
+
+
+# 4) filter duplicates on famid
+dup_bool = df['famid'].duplicated(keep='first')
+print(np.sum(dup_bool))
+
+df = df.loc[~dup_bool,:]
+print('N after duplicate screen:', df.shape[0])
+
+
+# In[15]:
+
+
+np.sum(df['famid'].duplicated(keep=False))
+
+
+# In[16]:
 
 
 df['averageManualRating'].unique()
 
 
-# In[13]:
+# In[17]:
 
 
 np.sum(df['averageManualRating'] == 2)
 
 
-# In[14]:
+# In[18]:
 
 
 # Convert age to years
@@ -163,7 +220,7 @@ df['ageAtScan1_Years'] = np.round(df.ageAtScan1/12, decimals=1)
 
 # # Define train/test split
 
-# In[15]:
+# In[19]:
 
 
 if train_test_str == 'squeakycleanExclude':
@@ -192,7 +249,7 @@ train_test_str = 'train_test'
 
 # ## Train/Test split
 
-# In[16]:
+# In[20]:
 
 
 # find unique ages
@@ -216,14 +273,14 @@ elif test_diff.size != 0:
 
 # ## Export
 
-# In[17]:
+# In[21]:
 
 
-phenos = ['Overall_Psychopathology','Psychosis_Positive','Psychosis_NegativeDisorg','AnxiousMisery','Externalizing','Fear']
+phenos = ['Overall_Psychopathology','Psychosis_Positive','Psychosis_NegativeDisorg','AnxiousMisery','Externalizing','Fear','F1_Exec_Comp_Res_Accuracy','F3_Executive_Efficiency','Overall_Speed']
 print(phenos)
 
 
-# In[18]:
+# In[22]:
 
 
 for pheno in phenos:
@@ -233,7 +290,7 @@ for pheno in phenos:
         df.loc[df.loc[:,pheno].isna(),pheno] = x
 
 
-# In[19]:
+# In[23]:
 
 
 # Normalize
@@ -251,18 +308,19 @@ for i, pheno in enumerate(phenos):
 print(np.sum(rank_r < 0.99))
 
 
-# In[20]:
+# In[24]:
 
 
 df.loc[:,phenos].var()
 
 
-# In[21]:
+# In[25]:
 
 
-header = ['squeakycleanExclude', 'train_test', 'ageAtScan1', 'ageAtScan1_Years','sex', 'race2', 'handednessv2', 'medu1',
-          'mprage_antsCT_vol_TBV', 'averageManualRating',
+header = ['squeakycleanExclude', 'train_test', 'ageAtScan1', 'ageAtScan1_Years','sex', 'race2', 'handednessv2', 'medu1', 'T1_snr', 'dti64MeanRelRMS', 'famid',
+          'mprage_antsCT_vol_TBV', 'averageManualRating', 'psychoactiveMedPsychv2', 'psychoactiveMedMedicalv2',
           'Overall_Psychopathology','Psychosis_Positive','Psychosis_NegativeDisorg','AnxiousMisery','Externalizing','Fear',
+          'F1_Exec_Comp_Res_Accuracy','F3_Executive_Efficiency','Overall_Speed',
           'goassessSmryMood', 'goassessSmryMan', 'goassessSmryDep', 'goassessSmryEat', 'goassessSmryBul',
           'goassessSmryAno', 'goassessSmryAnx', 'goassessSmryGad', 'goassessSmrySep', 'goassessSmryPhb', 'goassessSmrySoc',
           'goassessSmryPan', 'goassessSmryAgr', 'goassessSmryOcd', 'goassessSmryPtd', 'goassessSmryPsy', 'goassessSmryDel',
@@ -274,22 +332,24 @@ df.to_csv(os.path.join(outputdir, outfile_prefix+'df.csv'), columns = header)
 
 # # Plots
 
-# In[22]:
+# In[26]:
 
 
 if not os.path.exists(figdir): os.makedirs(figdir)
 os.chdir(figdir)
 sns.set(style='white', context = 'paper', font_scale = 1)
+sns.set_style({'font.family':'sans-serif', 'font.sans-serif':['Public Sans']})
 cmap = my_get_cmap('pair')
 
 labels = ['Train', 'Test']
-phenos_label_short = ['Ov. Psych.', 'Psy. (pos.)', 'Psy. (neg.)', 'Anx.-mis.', 'Ext.', 'Fear']
-phenos_label = ['Overall Psychopathology','Psychosis (Positive)','Psychosis (Negative)','Anxious-Misery','Externalizing','Fear']
+phenos = ['Overall_Psychopathology','Psychosis_Positive','Psychosis_NegativeDisorg','AnxiousMisery','Externalizing','Fear']
+phenos_label_short = ['Ov. psych.', 'Psy. (pos.)', 'Psy. (neg.)', 'Anx.-mis.', 'Ext.', 'Fear']
+phenos_label = ['Overall psychopathology','Psychosis (Positive)','Psychosis (Negative)','Anxious-Misery','Externalizing','Fear']
 
 
 # Figure 2A
 
-# In[23]:
+# In[27]:
 
 
 f, axes = plt.subplots(1,2)
@@ -327,7 +387,7 @@ f.savefig(outfile_prefix+'age_distributions.svg', dpi = 300, bbox_inches = 'tigh
 
 # Figure 2B
 
-# In[24]:
+# In[28]:
 
 
 df_rc = pd.melt(df, id_vars = train_test_str, value_vars = phenos)
