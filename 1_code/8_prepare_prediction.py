@@ -84,6 +84,7 @@ if not os.path.exists(outputdir): os.makedirs(outputdir)
 if not os.path.exists(figdir): os.makedirs(figdir)
 os.chdir(figdir)
 sns.set(style='white', context = 'paper', font_scale = 1)
+sns.set_style({'font.family':'sans-serif', 'font.sans-serif':['Public Sans']})
 
 phenos = ['Overall_Psychopathology','Psychosis_Positive','Psychosis_NegativeDisorg','AnxiousMisery','Externalizing','Fear']
 phenos_label_short = ['Ov. Psych.', 'Psy. (pos.)', 'Psy. (neg.)', 'Anx.-mis.', 'Ext.', 'Fear']
@@ -154,6 +155,7 @@ for metric in metrics:
 # In[13]:
 
 
+# export for prediction models
 df_node_test.to_csv(os.path.join(storedir, outfile_prefix+'X.csv'))
 df_z_test.to_csv(os.path.join(storedir, outfile_prefix+'X_z.csv'))
 
@@ -163,12 +165,22 @@ df_z_evd.to_csv(os.path.join(storedir, outfile_prefix+'X_z_evd.csv'))
 
 df_test.loc[:,phenos].to_csv(os.path.join(storedir, outfile_prefix+'y.csv'))
 
-# export for prediction models
 covs = ['ageAtScan1_Years', 'sex_adj']
 df_test.loc[:,covs].to_csv(os.path.join(storedir, outfile_prefix+'c_'+'_'.join(covs)+'.csv'))
 
-# export for prediction models
 covs = ['ageAtScan1_Years', 'sex_adj', 'medu1']
+df_test.loc[:,covs].to_csv(os.path.join(storedir, outfile_prefix+'c_'+'_'.join(covs)+'.csv'))
+
+covs = ['ageAtScan1_Years', 'sex_adj', 'averageManualRating']
+df_test.loc[:,covs].to_csv(os.path.join(storedir, outfile_prefix+'c_'+'_'.join(covs)+'.csv'))
+
+covs = ['ageAtScan1_Years', 'sex_adj', 'T1_snr']
+df_test.loc[:,covs].to_csv(os.path.join(storedir, outfile_prefix+'c_'+'_'.join(covs)+'.csv'))
+
+covs = ['ageAtScan1_Years', 'sex_adj', 'wrat4CrRaw']
+df_test.loc[:,covs].to_csv(os.path.join(storedir, outfile_prefix+'c_'+'_'.join(covs)+'.csv'))
+
+covs = ['ageAtScan1_Years', 'sex_adj', 'mprage_antsCT_vol_TBV']
 df_test.loc[:,covs].to_csv(os.path.join(storedir, outfile_prefix+'c_'+'_'.join(covs)+'.csv'))
 
 
@@ -210,47 +222,9 @@ f.ax_joint.collections[0].set_alpha(0)
 # In[17]:
 
 
-f, ax = plt.subplots(1,len(metrics))
-f.set_figwidth(5)
-f.set_figheight(2.5)
-
-N_components = []
-
-for i, metric in enumerate(metrics):
-    x = df_z_test.filter(regex = metric)
-#     x = df_node_test.filter(regex = metric)
-
-    # find number of PCs that explain 80% variance
-    pca = PCA(n_components = x.shape[1], svd_solver = 'full')
-    pca.fit(StandardScaler().fit_transform(x))
-    var_idx = pca.explained_variance_ratio_ >= .01
-    cum_var = np.cumsum(pca.explained_variance_ratio_)
-    n_components = np.sum(var_idx)
-#     n_components = np.where(cum_var >= 0.8)[0][0]+1
-    var_exp = cum_var[n_components-1]
-
-    N_components.append(n_components)
-    
-    x = StandardScaler().fit_transform(x)
-    pca = PCA(n_components=n_components, svd_solver='full', random_state = 0)
-    pca.fit(x)
-
-    ax[i].plot(pca.explained_variance_ratio_)
-    ax[i].set_xlabel('PCs')
-    if i == 0:
-        ax[i].set_ylabel('Variance explained')
-    ax[i].set_title(metric)
-    ax[i].tick_params(pad = -2)
-
-    print(metric, n_components, np.sum(pca.explained_variance_ratio_))
-    
-# f.savefig(outfile_prefix+'pca_scree.svg', dpi = 300, bbox_inches = 'tight', pad_inches = 0)
-
-
-# In[18]:
-
-
 sns.set(style='white', context = 'paper', font_scale = 1)
+sns.set_style({'font.family':'sans-serif', 'font.sans-serif':['Public Sans']})
+
 f, ax = plt.subplots(1,2)
 f.set_figwidth(4)
 f.set_figheight(2)
@@ -298,14 +272,14 @@ f.savefig(outfile_prefix+'pca_scree.svg', dpi = 300, bbox_inches = 'tight', pad_
 
 # ## Plot coefficients
 
-# In[19]:
+# In[18]:
 
 
 import matplotlib.image as mpimg
 from brain_plot_func import roi_to_vtx, brain_plot
 
 
-# In[20]:
+# In[19]:
 
 
 if parc_str == 'schaefer':
@@ -314,13 +288,13 @@ elif parc_str == 'lausanne':
     subject_id = 'lausanne125'
 
 
-# In[21]:
+# In[20]:
 
 
 figs_to_delete = []
 metric = metrics[1]; print(metric)
 
-i=0
+i=1
 if i == 0:
     x = df_z_test.filter(regex = metric)
 elif i == 1:   
@@ -349,7 +323,7 @@ for pc in np.arange(0,n_components):
         brain_plot(roi_data, parcel_names, parc_file, fig_str, subject_id = subject_id, hemi = hemi, surf = 'inflated', showcolorbar = False)
 
 
-# In[22]:
+# In[21]:
 
 
 for pc in np.arange(0,n_components):
@@ -385,7 +359,7 @@ for pc in np.arange(0,n_components):
         f.savefig(outfile_prefix+metric+'_raw_pc_'+str(pc)+'.png', dpi = 300, bbox_inches = 'tight', pad_inches = 0)
 
 
-# In[23]:
+# In[22]:
 
 
 for file in figs_to_delete:
