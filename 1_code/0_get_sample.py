@@ -99,6 +99,8 @@ clinical = pd.read_csv(os.path.join(os.environ['DATADIR'], 'external/pncDataFree
 clinical_psychosis = pd.read_csv(os.path.join(os.environ['DATADIR'], 'external/pncDataFreeze20170905/n1601_dataFreeze/clinical/n1601_diagnosis_dxpmr_20170509.csv'))
 # Cognition
 cnb = pd.read_csv(os.path.join(os.environ['DATADIR'], 'external/pncDataFreeze20170905/n1601_dataFreeze/cnb/n1601_cnb_factor_scores_tymoore_20151006.csv'))
+# WRAT
+wrat = pd.read_csv(os.path.join(os.environ['DATADIR'], 'external/pncDataFreeze20170905/n1601_dataFreeze/cnb/n1601_cnb_wrat_scores_20161215.csv'))
 
 # merge
 df = health
@@ -112,6 +114,7 @@ df = pd.merge(df, clinical, on=['scanid', 'bblid']) # clinical
 df = pd.merge(df, clinical_psychosis, on=['scanid', 'bblid']) # clinical
 df = pd.merge(df, goassess, on=['bblid']) # goassess
 df = pd.merge(df, cnb, on=['scanid', 'bblid']) # cnb
+df = pd.merge(df, wrat, on=['scanid', 'bblid']) # cnb
 
 print(df.shape[0])
 
@@ -276,7 +279,7 @@ elif test_diff.size != 0:
 # In[21]:
 
 
-phenos = ['Overall_Psychopathology','Psychosis_Positive','Psychosis_NegativeDisorg','AnxiousMisery','Externalizing','Fear','F1_Exec_Comp_Res_Accuracy','F3_Executive_Efficiency','Overall_Speed']
+phenos = ['Overall_Psychopathology','Psychosis_Positive','Psychosis_NegativeDisorg','AnxiousMisery','Externalizing','Fear','F1_Exec_Comp_Res_Accuracy','F3_Executive_Efficiency','Overall_Speed','wrat4CrRaw','wrat4CrStd']
 print(phenos)
 
 
@@ -291,6 +294,13 @@ for pheno in phenos:
 
 
 # In[23]:
+
+
+phenos = ['Overall_Psychopathology','Psychosis_Positive','Psychosis_NegativeDisorg','AnxiousMisery','Externalizing','Fear','F1_Exec_Comp_Res_Accuracy','F3_Executive_Efficiency','Overall_Speed']
+print(phenos)
+
+
+# In[24]:
 
 
 # Normalize
@@ -308,19 +318,20 @@ for i, pheno in enumerate(phenos):
 print(np.sum(rank_r < 0.99))
 
 
-# In[24]:
+# In[25]:
 
 
 df.loc[:,phenos].var()
 
 
-# In[25]:
+# In[26]:
 
 
-header = ['squeakycleanExclude', 'train_test', 'ageAtScan1', 'ageAtScan1_Years','sex', 'race2', 'handednessv2', 'medu1', 'T1_snr', 'dti64MeanRelRMS', 'famid',
-          'mprage_antsCT_vol_TBV', 'averageManualRating', 'psychoactiveMedPsychv2', 'psychoactiveMedMedicalv2',
+header = ['squeakycleanExclude', 'train_test', 'ageAtScan1', 'ageAtScan1_Years','sex', 'race2', 'handednessv2', 'medu1', 'famid', 'T1_snr', 'mprage_antsCT_vol_TBV', 'averageManualRating', 'dti64MeanRelRMS',
           'Overall_Psychopathology','Psychosis_Positive','Psychosis_NegativeDisorg','AnxiousMisery','Externalizing','Fear',
           'F1_Exec_Comp_Res_Accuracy','F3_Executive_Efficiency','Overall_Speed',
+          'wrat4CrRaw', 'wrat4CrStd',
+          'psychoactiveMedPsychv2', 'psychoactiveMedMedicalv2',
           'goassessSmryMood', 'goassessSmryMan', 'goassessSmryDep', 'goassessSmryEat', 'goassessSmryBul',
           'goassessSmryAno', 'goassessSmryAnx', 'goassessSmryGad', 'goassessSmrySep', 'goassessSmryPhb', 'goassessSmrySoc',
           'goassessSmryPan', 'goassessSmryAgr', 'goassessSmryOcd', 'goassessSmryPtd', 'goassessSmryPsy', 'goassessSmryDel',
@@ -332,7 +343,7 @@ df.to_csv(os.path.join(outputdir, outfile_prefix+'df.csv'), columns = header)
 
 # # Plots
 
-# In[26]:
+# In[27]:
 
 
 if not os.path.exists(figdir): os.makedirs(figdir)
@@ -349,7 +360,7 @@ phenos_label = ['Overall psychopathology','Psychosis (Positive)','Psychosis (Neg
 
 # Figure 2A
 
-# In[27]:
+# In[28]:
 
 
 f, axes = plt.subplots(1,2)
@@ -387,7 +398,7 @@ f.savefig(outfile_prefix+'age_distributions.svg', dpi = 300, bbox_inches = 'tigh
 
 # Figure 2B
 
-# In[28]:
+# In[29]:
 
 
 df_rc = pd.melt(df, id_vars = train_test_str, value_vars = phenos)
