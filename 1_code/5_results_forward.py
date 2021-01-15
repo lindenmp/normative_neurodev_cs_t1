@@ -56,6 +56,10 @@ outfile_prefix
 figdir = os.path.join(os.environ['OUTPUTDIR'], 'figs')
 print(figdir)
 if not os.path.exists(figdir): os.makedirs(figdir)
+os.chdir(figdir)
+
+sns.set(style='white', context = 'paper', font_scale = 1)
+sns.set_style({'font.family':'sans-serif', 'font.sans-serif':['Public Sans']})
 
 
 # ## Load data pre-nispat data
@@ -99,9 +103,6 @@ df_expv = pd.DataFrame(data = expv, index = df_node.columns)
 # In[9]:
 
 
-sns.set(style='white', context = 'paper', font_scale = 0.8)
-sns.set_style({'font.family':'sans-serif', 'font.sans-serif':['Public Sans']})
-
 f, ax = plt.subplots(1,2)
 f.set_figwidth(3.5)
 f.set_figheight(1.75)
@@ -110,13 +111,13 @@ sns.histplot(smse, ax=ax[0])
 ax[0].set_xlabel('Standardized \nmean squared error')
 ax[0].tick_params(pad = -2)
 ax[0].set_ylabel('Count', labelpad=-1)
-ax[0].set_ylim([0,120])
+ax[0].set_ylim([0,110])
 
 sns.histplot(expv, ax=ax[1])
 ax[1].set_xlabel('Explained variance')
 ax[1].tick_params(pad = -2)
 ax[1].set_ylabel('')
-ax[1].set_ylim([0,120])
+ax[1].set_ylim([0,110])
 ax[1].set_yticklabels('')
 
 f.savefig(outfile_prefix+'nm_diagnostics.svg', dpi = 300, bbox_inches = 'tight', pad_inches = 0)
@@ -179,11 +180,6 @@ df_yhat_diff.filter(regex = 'vol', axis = 0).abs().max()
 
 # In[14]:
 
-
-if not os.path.exists(figdir): os.makedirs(figdir)
-os.chdir(figdir)
-sns.set(style='white', context = 'paper', font_scale = 1)
-cmap = my_get_cmap('pair')
 
 # metrics = ['ct', 'vol']
 # metrics_label_short = ['Thickness', 'Volume']
