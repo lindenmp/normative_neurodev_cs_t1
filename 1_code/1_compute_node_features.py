@@ -33,7 +33,7 @@ from func import set_proj_env
 # In[3]:
 
 
-train_test_str = 'squeakycleanExclude'
+train_test_str = 'train_test'
 exclude_str = 't1Exclude' # 't1Exclude' 'fsFinalExclude'
 parc_str = 'schaefer' # 'schaefer' 'lausanne'
 parc_scale = 400 # 200 400 | 60 125 250
