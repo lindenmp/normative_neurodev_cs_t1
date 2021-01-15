@@ -90,6 +90,8 @@ demog = pd.read_csv(os.path.join(os.environ['DATADIR'], 'external/pncDataFreeze2
 brain_vol = pd.read_csv(os.path.join(os.environ['DATADIR'], 'external/pncDataFreeze20170905/n1601_dataFreeze/neuroimaging/t1struct/n1601_ctVol20170412.csv'))
 # dti QA
 dti_qa = pd.read_csv(os.path.join(os.environ['DATADIR'], 'external/pncDataFreeze20170905/n1601_dataFreeze/neuroimaging/dti/n1601_dti_qa_20170301.csv'))
+# rest QA
+rest_qa = pd.read_csv(os.path.join(os.environ['DATADIR'], 'external/pncDataFreeze20170905/n1601_dataFreeze/neuroimaging/rest/n1601_RestQAData_20170714.csv'))
 
 # GOASSESS Bifactor scores
 goassess = pd.read_csv(os.path.join(os.environ['DATADIR'], 'external/GO1_clinical_factor_scores_psychosis_split_BIFACTOR.csv'))
@@ -109,6 +111,7 @@ df = pd.merge(df, t1_qa, on=['scanid', 'bblid']) # t1_qa
 df = pd.merge(df, demog, on=['scanid', 'bblid']) # demog
 df = pd.merge(df, brain_vol, on=['scanid', 'bblid']) # brain_vol
 df = pd.merge(df, dti_qa, on=['scanid', 'bblid']) # dti_qa
+df = pd.merge(df, rest_qa, on=['scanid', 'bblid']) # rest_qa
 
 df = pd.merge(df, clinical, on=['scanid', 'bblid']) # clinical
 df = pd.merge(df, clinical_psychosis, on=['scanid', 'bblid']) # clinical
@@ -165,12 +168,16 @@ df.head()
 
 
 # 1) Primary sample filter
+n = 1601
 df = df[df['healthExcludev2'] == 0]
 print('N after initial exclusion:', df.shape[0])
+print('\t N delta:', n - df.shape[0])
 
 # 2) T1 exclusion
+n = df.shape[0]
 df = df[df[exclude_str] == 0]
 print('N after T1 exclusion:', df.shape[0])
+print('\t N delta:', n - df.shape[0])
 
 
 # In[13]:
@@ -180,9 +187,11 @@ print('N after T1 exclusion:', df.shape[0])
 screen = [train_test_str, 'ageAtScan1', 'sex', 'race2', 'handednessv2', 'medu1', 'mprage_antsCT_vol_TBV', 'averageManualRating', 'psychoactiveMedPsychv2', 'psychoactiveMedMedicalv2', 'T1_snr', 'famid',
           'Overall_Psychopathology','Psychosis_Positive','Psychosis_NegativeDisorg','AnxiousMisery','Externalizing','Fear']
 
+n = df.shape[0]
 drop_idx = df.loc[:,screen].isna().any(axis = 1)
 df = df.loc[~drop_idx,:]
 print('N after variable screen:', df.shape[0])
+print('\t N delta:', n - df.shape[0])
 
 
 # In[14]:
@@ -211,7 +220,8 @@ df['averageManualRating'].unique()
 # In[17]:
 
 
-np.sum(df['averageManualRating'] == 2)
+print(np.sum(df['averageManualRating'] == 2))
+print(np.sum(df['averageManualRating'] == 2)/df.shape[0]*100)
 
 
 # In[18]:
