@@ -21,11 +21,12 @@ cluster_spec = 'cubica'
 # directories
 # ------------------------------------------------------------------------------
 file_prefix = 't1Exclude_schaefer_400_'
+# file_prefix = 'fsFinalExclude_lausanne_250_'
 
-inputdir = '/cbica/home/parkesl/research_projects/normative_neurodev_cs_t1/2_pipeline/2_prepare_normative/out/'
+inputdir = '/cbica/home/parkesl/research_projects/normative_neurodev_cs_t1/2_pipeline_nosibs/2_prepare_normative/out/'
 print(inputdir)
 
-outputdir = '/cbica/home/parkesl/research_projects/normative_neurodev_cs_t1/2_pipeline/4_run_normative/'
+outputdir = '/cbica/home/parkesl/research_projects/normative_neurodev_cs_t1/2_pipeline_nosibs/4_run_normative/'
 print(outputdir)
 if not os.path.exists(outputdir): os.makedirs(outputdir)
 
