@@ -132,7 +132,10 @@ def my_cross_val_score(X, y, c, my_cv, reg, my_scorer, runpca=1):
         n_components = np.sum(var_idx)
         print(n_components)
     elif runpca == 3:
-        n_components = 8
+        if X.shape[1] == 400:
+            n_components = 9
+        elif X.shape[1] == 463:
+            n_components = 8
         print(n_components)
 
     for k in np.arange(len(my_cv)):
@@ -195,7 +198,7 @@ def run_perm(X, y, c, reg, my_scorer, n_splits = 10, runpca = 1):
 
     my_cv = get_cv(y, n_splits = n_splits)
 
-    n_perm = 10000
+    n_perm = 100000
     permuted_acc = np.zeros((n_perm,))
 
     for i in np.arange(n_perm):
