@@ -294,7 +294,7 @@ elif parc_str == 'lausanne':
 figs_to_delete = []
 metric = metrics[1]; print(metric)
 
-i=1
+i=0
 if i == 0:
     x = df_z_test.filter(regex = metric)
 elif i == 1:   
