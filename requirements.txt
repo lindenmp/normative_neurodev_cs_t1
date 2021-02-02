@@ -5,7 +5,7 @@ async-generator==1.10
 attrs==20.2.0
 backcall==0.2.0
 bctpy==0.5.2
-bleach==3.1.5
+bleach==3.3.0
 brainspace==0.1.1
 certifi==2020.6.20
 cffi==1.14.2
