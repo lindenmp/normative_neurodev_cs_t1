@@ -83,7 +83,7 @@ pysurfer==0.11.0
 python-dateutil==2.8.1
 python-utils==2.4.0
 pytz==2020.1
-PyYAML==5.3.1
+PyYAML==5.4
 pyzmq==19.0.2
 regressors==0.0.3
 requests==2.24.0
