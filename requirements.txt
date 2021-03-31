@@ -42,7 +42,7 @@ jupyterlab-pygments==0.1.1
 jupyterlab-server==1.2.0
 kiwisolver==1.2.0
 littleutils==0.2.2
-lxml==4.5.2
+lxml==4.6.3
 MarkupSafe==1.1.1
 mat73==0.41
 matplotlib==3.3.2
