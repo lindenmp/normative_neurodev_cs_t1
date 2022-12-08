@@ -7,7 +7,7 @@ backcall==0.2.0
 bctpy==0.5.2
 bleach==3.1.5
 brainspace==0.1.1
-certifi==2020.6.20
+certifi==2022.12.7
 cffi==1.14.2
 chardet==3.0.4
 configobj==5.0.6
